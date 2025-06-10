@@ -12,80 +12,55 @@ from utils import get_layers
 
 class EnHancingAttentionHead:
     def __init__(self, beta, img_start, img_end):
-        """
-        初始化类：包含阈值 beta 和图像 token 的起始、结束索引
-        """
-        self.beta = beta  # 设置阈值 beta
-        self.s = img_start  # 图像 token 的起始索引
-        self.e = img_end  # 图像 token 的结束索引
-        self.hist_attn_weights = None  # 初始化历史注意力权重矩阵
+        self.beta = beta 
+        self.s = img_start 
+        self.e = img_end 
+        self.hist_attn_weights = None 
         self.max_head_idx = None
 
     def compute_dense_head(self, attention_matrix):
-        """
-        计算每个头 (head) 的视觉汇集数量矩阵
-        """
         k = random.randint(self.s, self.e)
         # k = 0
         # print('k value: ', k)
-        # 生成掩码矩阵 M（对角线为 0）
         B, H, N, _ = attention_matrix.shape
         r = N
         M = 1-torch.eye(N, device=attention_matrix.device).unsqueeze(0).unsqueeze(0).expand(B, H, N, N)
-        # 提取图像 token 的注意力分数
         img_token_masked = (attention_matrix * M)[:, :, k:r, :]  # [B, H, r-k, N]
 
-        avg_attention = img_token_masked.mean(dim=2)  # 对行求和
+        avg_attention = img_token_masked.mean(dim=2) 
 
-        # 获取满足阈值的视觉汇集位置 (x, y)
         vision_sink_indices = avg_attention > self.beta
 
-        # 统计每个头的视觉汇集数量
         vision_sink_matrix = vision_sink_indices.sum(dim=-1)
 
         return vision_sink_matrix
 
     def enhancing_attention(self, attention_matrix):
-        """
-        根据视觉汇集数量增强注意力矩阵
-        """
-        # 计算视觉汇集矩阵
         vision_sink_matrix = self.compute_dense_head(attention_matrix)
-        # print(f"vision_sink_matrix: {vision_sink_matrix}")  # 期望：[B, H, N]
+        # print(f"vision_sink_matrix: {vision_sink_matrix}") 
         # 如果 vision_sink_matrix 均为空，直接返回原始的 attention_matrix_enhanced
         if torch.all(vision_sink_matrix == 0):
             print(f'=============================================')
             print(f'Layer 2 no copies')
             return attention_matrix, None
         
-        # 初始化增强后的注意力矩阵
         attention_matrix_enhanced = torch.zeros_like(attention_matrix)
         
-        # 遍历每个 batch 进行处理
-        for batch in range(attention_matrix.size(0)):  # batch 维度
+        for batch in range(attention_matrix.size(0)): 
             H = []  # 用于存储 (Ci,j, j) 的列表
             
-            # 遍历每个头（head）
-            for head in range(attention_matrix.size(1)):  # head 维度
-                # 获取当前头的视觉汇集数量
+            for head in range(attention_matrix.size(1)): 
                 vision_sinks = vision_sink_matrix[batch, head]
                 
-                # 将视觉汇集数量及对应的头索引添加到 H 中
                 H.append((vision_sinks.item(), head))
             
-            # 找到视觉汇集数量最多的头
             _, max_dense_head_idx = max(H, key=lambda x: x[0])
             
-            # 遍历所有头并更新头矩阵
             for head in range(attention_matrix.size(1)):
                 attention_matrix_enhanced[batch, head] = attention_matrix[batch, max_dense_head_idx].clone()
-            # print(f'Layer 2 copy head{max_dense_head_idx}')
-            # print(H)
 
         return attention_matrix_enhanced, max_dense_head_idx
-        # return attention_matrix_enhanced
-    
-    
+
 
 def enhanced_attn_forward(
         self,
@@ -162,38 +137,7 @@ def enhanced_attn_forward(
 
     # upcast attention to fp32
     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-    # '''
-    # 思路1: 全局EAH
-    # '''
-    # if attn_weights.shape[-2] == 1:  # 推理生成阶段
-    #     zero_column = torch.zeros((eah.hist_attn_weights.shape[0], eah.hist_attn_weights.shape[1], eah.hist_attn_weights.shape[2], 1), device=eah.hist_attn_weights.device)
-    #     eah.hist_attn_weights = torch.cat((eah.hist_attn_weights, zero_column), dim=3)  # 在历史 Attention Weights 的最前面增加一列0
-    #     eah.hist_attn_weights = torch.cat((eah.hist_attn_weights, attn_weights), dim=2)
-    # else:  # prompt阶段
-    #     eah.hist_attn_weights = attn_weights.clone()
-        
-    # if attn_weights.shape[-1] > 700:
-    #     pass
-    # # 添加 EAH 部分
-    # if attn_weights.shape[-2] > 1:  # prompt阶段
-    #     attn_weights = eah.enhancing_attention(eah.hist_attn_weights)
-    # else:  # 生成推理阶段
-    #     attn_weights = eah.enhancing_attention(eah.hist_attn_weights)[:,:,-1,:].unsqueeze(-2)
-
-    # print("attn_weights shape:", attn_weights.shape)
-    # '''
-    # 思路2: prompt阶段EAH+广播
-    # '''
-    # if attn_weights.shape[-2] > 1:  #prompt阶段
-    #     attn_weights, eah.max_head_idx = eah.enhancing_attention(attn_weights)
-    # else:  # 生成推理阶段
-    #     for batch in range(attn_weights.shape[0]):
-    #         for head in range(attn_weights.shape[1]):
-    #             attn_weights[batch, head] = attn_weights[batch, eah.max_head_idx].clone()
-                
-    '''
-    思路3: 仅对prompt阶段进行EAH
-    '''
+                    
     if attn_weights.shape[-2] > 1:  #prompt阶段
         attn_weights, eah.max_head_idx = eah.enhancing_attention(attn_weights)
         # print(f"Max dense head index is head {eah.max_head_idx}")
@@ -224,95 +168,10 @@ def enhanced_attn_forward(
 
     return attn_output, attn_weights, past_key_value
 
-'''
-替换模型原理：
-在Python中,函数是一等公民，可以像普通变量一样被赋值和替换。
-例如: 替换带掉类module中的forward方法就可以使用: 
-def new_forward(self, x):
-    return x + 10
-model.forward = new_forward.__get__(model, model.__class__)  # 绑定到实例:替换函数.__get__(目标实例, 类) model.__class__表示实例meodel所在的类)
-'''
 def replace_attention_with_eah(model, beta, img_start, img_end, layers_to_modify):
-    # 初始化 EAH 模块
     eah = EnHancingAttentionHead(beta, img_start, img_end)
     
     for idx, layer in enumerate(get_layers(model)):
         if idx in layers_to_modify:
             layer.self_attn.forward = partial(enhanced_attn_forward, layer.self_attn, eah)
             
-
-if __name__ == "__main__":
-    # 替换是否成功测试
-    from utils import *
-
-    def test_get_model():
-        # 设置设备（CUDA或CPU）
-        # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        device = torch.device("cpu")
-        
-        # 模型路径
-        model_path = "/data/huazhenglin/model_cache/models--llava-hf--llava-1.5-7b-hf"
-
-        # 调用get_model函数
-        processor, model, template, ans_start, num_img_tokens, image_start = get_model(model_path, device)
-
-        # 输出模型信息，验证是否加载正确
-        print(f"Processor: {processor}")
-        print(f"Model: {model}")
-        print(f"Template: {template}")
-        print(f"Answer start token: {ans_start}")
-        print(f"Number of image tokens: {num_img_tokens}")
-        print(f"Image start token position: {image_start}")
-
-        # 验证模型的注意力层是否替换成功
-        attention_layer_replaced = False
-        for name, module in model.named_modules():
-            if isinstance(module, LlamaAttention):
-                # 检查替换后的forward方法
-                if hasattr(module, 'forward'):
-                    attention_layer_replaced = True
-                    print(f"Successfully replaced forward method in module: {name}")
-                else:
-                    print(f"Forward method not replaced in module: {name}")
-
-        # 如果没有找到替换的注意力层，抛出异常
-        if not attention_layer_replaced:
-            print("Failed to replace the attention layer.")
-            return
-    
-    test_get_model()
-    
-    # EAH算法测试
-    # B, H, N = 1, 4, 3
-    # attention_matrix = torch.tensor([[[[0.7314, 0.1738, 0.6979],
-    #                                 [0.2087, 0.2514, 0.6493],
-    #                                 [0.5961, 0.5475, 0.3812]],
-
-    #                                 [[0.9215, 0.8532, 0.2492],
-    #                                 [0.6884, 0.2644, 0.9124],
-    #                                 [0.5978, 0.7390, 0.1311]],
-
-    #                                 [[0.7547, 0.9125, 0.6518],
-    #                                 [0.5122, 0.3441, 0.9679],
-    #                                 [0.2093, 0.8595, 0.9524]],
-
-    #                                 [[0.4322, 0.9295, 0.6971],
-    #                                 [0.5690, 0.3162, 0.0731],
-    #                                 [0.8660, 0.0930, 0.7360]]]]).float()
-    # beta = 1  # 设置阈值
-    # img_start = 0  # 图像token的起始索引
-    # img_end = N-1   # 图像token的结束索引
-
-    # # 实例化EnHancingAttentionHead类
-    # enhancer = EnHancingAttentionHead(beta, img_start, img_end)
-
-    # # 测试compute_dense_head
-    # vision_sink_matrix = enhancer.compute_dense_head(attention_matrix)
-
-    # # 测试enhancing_attention
-    # enhanced_attention = enhancer.enhancing_attention(attention_matrix)
-    # print(f"Enhanced attention matrix: {enhanced_attention}")  # 期望：[B, H, N, N]
-
-
-
-
