@@ -6,7 +6,7 @@ Official implementation of our paper "Cracking the Code of Hallucination in LVLM
 ```
 conda create -n vhr python=3.10
 conda activate vhr
-pip install -r requiresments.txt
+pip install -r requirements.txt
 ```
 
 ## Prepare datasets and models
