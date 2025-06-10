@@ -226,7 +226,7 @@ if __name__ == "__main__":
     for seed in range(5):
         hal_test.infer_dataset("chair", seed)
 
-    # for dataset in ["pope_popular", "pope_adversarial", "pope_random"]:
-    #     hal_test.infer_dataset(dataset, 0)
+    for dataset in ["pope_popular", "pope_adversarial", "pope_random"]:
+        hal_test.infer_dataset(dataset, 0)
 
     # hal_test.infer_dataset("llava_wild", 0)
