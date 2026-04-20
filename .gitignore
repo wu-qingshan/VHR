@@ -1,0 +1,17 @@
+data/
+models/
+results
+POPE/
+val2014/
+train2014/
+*.zip
+*.zip.*
+__pycache__/
+*.log
+logs/
+.cache/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+*.swp
+.DS_Store
