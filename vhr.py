@@ -1,5 +1,6 @@
 from functools import partial
 
+import math
 import torch
 import transformers
 from transformers.models.llama.modeling_llama import *
@@ -19,8 +20,21 @@ def vhr_forward(
     position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
     aug_ratio: float = 1,
     filter: bool = False,
+    use_avhr: bool = False,
+    avhr_tau: float = 1.0,
+    avhr_rho_max: float = 2.0,
+    avhr_gamma_l: float = 1.0,
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    """
+    VHR / A-VHR forward.
+
+    - 默认 (use_avhr=False): 论文原版 VHR，固定 aug_ratio + 中位数硬阈值。
+    - 启用 (use_avhr=True): A-VHR (Adaptive-ratio VHR)，按下式给每个 head 一个连续 ratio：
+            r_h = 1 + (rho_max - 1) * gamma_l * sigmoid((v_h - mu) / (tau * s))
+        其中 v_h 是 head_vary，mu / s 为层内均值和标准差，gamma_l 是层深衰减系数（在
+        VHR 作用范围内，越靠近输出层越小，使顶层更保守）。
+    """
     if output_attentions:
         # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
         logger.warning_once(
@@ -95,20 +109,39 @@ def vhr_forward(
 
     now_attn_output = attn_output[0, :, -1, :]
 
+    # ---------- VHR / A-VHR head re-weighting ----------
     if attn_output.shape[-2] > 1 and (not hasattr(self, "attn_output_tc") or self.attn_output_tc is None):
+        # 第一次 prefill：缓存 text-contrast 路径的最后一个 token 表示
         self.attn_output_tc = now_attn_output
 
     elif attn_output.shape[-2] > 1:
-        head_vary = ((self.attn_output_tc - now_attn_output)**2).sum(-1)
+        # 第二次 prefill：基于两次 prefill 计算 head_vary，决定本步以及后续 decoding 的加权
+        head_vary = ((self.attn_output_tc - now_attn_output) ** 2).sum(-1)
         if head_vary.std() > 1 and filter:
-            aotc = (self.attn_output_tc**2).sum(-1)
-            head_vary[(head_vary>(head_vary.mean()+head_vary.std()))&(aotc>(aotc.mean()+aotc.std()))] = 0
+            aotc = (self.attn_output_tc ** 2).sum(-1)
+            head_vary[(head_vary > (head_vary.mean() + head_vary.std())) & (aotc > (aotc.mean() + aotc.std()))] = 0
         self.attn_output_tc = None
-        self.aug_heads = (head_vary > head_vary.median()).nonzero().flatten()
-        attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
+
+        if use_avhr:
+            mu = head_vary.mean()
+            s = head_vary.std() + 1e-6
+            gate = torch.sigmoid((head_vary - mu) / (avhr_tau * s))           # [num_heads]
+            ratio = 1.0 + (avhr_rho_max - 1.0) * avhr_gamma_l * gate          # [num_heads]
+            ratio = ratio.to(attn_output.dtype).view(1, -1, 1, 1)             # [1, H, 1, 1]
+            self.aug_ratio_per_head = ratio
+            self.aug_heads = None  # 标记走 A-VHR 分支
+            attn_output = attn_output * ratio
+        else:
+            self.aug_heads = (head_vary > head_vary.median()).nonzero().flatten()
+            self.aug_ratio_per_head = None
+            attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
 
     elif attn_output.shape[-2] == 1:
-        attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
+        # decoding 步：复用 prefill 时计算好的加权
+        if getattr(self, "aug_ratio_per_head", None) is not None:
+            attn_output = attn_output * self.aug_ratio_per_head
+        elif getattr(self, "aug_heads", None) is not None:
+            attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
     
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.view(bsz, q_len, -1)
@@ -118,13 +151,61 @@ def vhr_forward(
     return attn_output, None, past_key_value
 
 
-def replace_attn(model, target_layers=None, aug_ratio=2, filter=False):
+def _compute_gamma_l(layer_idx, target_layers, alpha):
+    """在 VHR 作用范围内计算层深衰减系数：
+       gamma_l = exp(-alpha * (l - l_start) / max(1, l_end - l_start))
+       l_start (作用范围内最小 idx) -> gamma=1
+       l_end   (作用范围内最大 idx) -> gamma=exp(-alpha)
+    """
+    if not target_layers:
+        return 1.0
+    l_start = min(target_layers)
+    l_end = max(target_layers)
+    span = max(1, l_end - l_start)
+    return math.exp(-alpha * (layer_idx - l_start) / span)
+
+
+def replace_attn(
+    model,
+    target_layers=None,
+    aug_ratio=2,
+    filter=False,
+    use_avhr=False,
+    avhr_tau=1.0,
+    avhr_alpha=0.5,
+    avhr_rho_max=2.0,
+):
+    """绑定每一层的 attention forward。
+
+    Args:
+        target_layers: 应用 VHR 的层 idx 列表（与 main.py 计算一致）。
+        aug_ratio:    原版 VHR 的固定加权倍率。
+        filter:       原版 VHR 的离群头过滤。
+        use_avhr:     是否启用 A-VHR（连续头加权 + 层深衰减）。
+        avhr_tau:     sigmoid 温度，越小越接近硬门控。
+        avhr_alpha:   层深衰减强度，0 表示不衰减；越大顶层越保守。
+        avhr_rho_max: 单 head 加权上限 rho_max。
+    """
     target_layers = target_layers or []
-    
+
     forward = transformers.models.llama.modeling_llama.LlamaSdpaAttention.forward
-    
+
     for idx, layer in enumerate(get_layers(model)):
         if idx in target_layers:
-            layer.self_attn.forward = partial(vhr_forward, layer.self_attn, aug_ratio=aug_ratio, filter=filter)
+            gamma_l = _compute_gamma_l(idx, target_layers, avhr_alpha) if use_avhr else 1.0
+            layer.self_attn.forward = partial(
+                vhr_forward,
+                layer.self_attn,
+                aug_ratio=aug_ratio,
+                filter=filter,
+                use_avhr=use_avhr,
+                avhr_tau=avhr_tau,
+                avhr_rho_max=avhr_rho_max,
+                avhr_gamma_l=gamma_l,
+            )
+            # 清空可能残留的状态
+            layer.self_attn.attn_output_tc = None
+            layer.self_attn.aug_heads = None
+            layer.self_attn.aug_ratio_per_head = None
         else:
             layer.self_attn.forward = partial(forward, layer.self_attn)

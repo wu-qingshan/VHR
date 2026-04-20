@@ -1372,9 +1372,13 @@ def generate(
         )
     elif generation_mode == GenerationMode.VHR_GENERATION:
         replace_attn_vhr(self,
-                         target_layers=generation_config.vhr_layers, 
+                         target_layers=generation_config.vhr_layers,
                          aug_ratio=generation_config.vhr_aug_ratio,
-                         filter=generation_config.vhr_filter)
+                         filter=generation_config.vhr_filter,
+                         use_avhr=generation_config.vhr_use_avhr,
+                         avhr_tau=generation_config.vhr_tau,
+                         avhr_alpha=generation_config.vhr_alpha,
+                         avhr_rho_max=generation_config.vhr_rho_max)
         result = self._vhr_decoding(
             input_ids,
             logits_processor=prepared_logits_processor,
@@ -1763,6 +1767,11 @@ def generation_config_init(self, **kwargs):
     self.vhr_filter = kwargs.pop("vhr_filter", False)
     self.vhr_image_start = kwargs.pop("vhr_image_start", None)
     self.vhr_image_end = kwargs.pop("vhr_image_end", None)
+    # A-VHR (Adaptive-ratio VHR) hyper-parameters
+    self.vhr_use_avhr = kwargs.pop("vhr_use_avhr", False)
+    self.vhr_tau = kwargs.pop("vhr_tau", 1.0)
+    self.vhr_alpha = kwargs.pop("vhr_alpha", 0.5)
+    self.vhr_rho_max = kwargs.pop("vhr_rho_max", 2.0)
 
     # VCD generation
     self.images_cd = kwargs.pop("images_cd", None)
