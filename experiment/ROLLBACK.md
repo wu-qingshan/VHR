@@ -31,3 +31,16 @@ git restore --source scvhr-instructblip-stable-20260716 -- main.py generation.py
 2. 新改动先跑静态检查与 1 图冒烟，再进入固定开发集。
 3. 未通过预设门槛时，在实验记录中标为负结果；核心实现恢复到本标签或保持默认 SC-VHR 路径不变。
 4. 正式测试数据不用于调参。
+
+## LLaVA-1.5 跨模型诊断检查点
+
+- 标签：`scvhr-llava15-crossval-20260716`
+- 分支：`research/scvhr-llava15`
+- 内容：冻结 LLaVA dev/validation 运行脚本、覆盖诊断脚本和完整实验记录。
+- 结果目录保持未跟踪：`llava15_scvhr_dev_results/`、`llava15_scvhr_validation_results/`、`llava15_scvhr_smoke_results/`。
+
+恢复该诊断阶段代码而不覆盖当前工作树：
+
+```bash
+git switch -c restore/scvhr-llava15 scvhr-llava15-crossval-20260716
+```

@@ -1,7 +1,18 @@
-# DC-VHR 当前研究状态
+# VHR 改进当前研究状态
 
-> 更新时间：2026-07-15
+> 更新时间：2026-07-16
 > 详细全过程见 `experiment/CS-VHR.md`；原项目诊断见 `EXPERIMENT_DIAGNOSIS.md`。
+
+## 最新进展：SC-VHR 的 LLaVA-1.5 冻结迁移
+
+InstructBLIP 稳定结果与 POPE 负结果保持不变。冻结 SC-VHR 已在 LLaVA-1.5 的独立 dev/validation 各 100 图上完成：
+
+| 数据 | VHR CHAIRs/CHAIRi/Len | SC-VHR CHAIRs/CHAIRi/Len | generated mentions 保留率 |
+|---|---|---|---:|
+| dev | 43.0 / 15.26 / 80.14 | **35.0 / 12.34 / 78.42** | 90.16% |
+| validation | 34.0 / 11.25 / 82.03 | **21.0 / 6.60 / 81.10** | 91.70% |
+
+CHAIRs/CHAIRi 两套均显著改善且长度稳定，但 total generated mentions 均低于预注册 93% 下限，因此不进入 LLaVA 正式五种子，也不扫描参数。事后规范化对象诊断显示唯一正确对象仍保留 96.6%/95.3%，而幻觉 mentions 降低 27.1%/46.3%；应表述为“跨架构幻觉降低成立，但 coverage-preserving 结论未过预注册 gate”。完整记录见 `experiment/SC-VHR-LLAVA15.md`。
 
 ## 已放弃的第一候选：DC-VHR
 
