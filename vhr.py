@@ -1,9 +1,11 @@
 from functools import partial
+from typing import Optional, Tuple
 
 import math
 import torch
 import transformers
 from transformers.models.llama.modeling_llama import *
+from transformers.cache_utils import Cache
 
 from utils import get_layers
 
@@ -20,6 +22,9 @@ def vhr_forward(
     position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
     aug_ratio: float = 1,
     filter: bool = False,
+    score_mode: str = "magnitude",
+    head_fraction: float = 0.5,
+    positive_only: bool = False,
     use_avhr: bool = False,
     avhr_tau: float = 1.0,
     avhr_rho_max: float = 2.0,
@@ -110,13 +115,84 @@ def vhr_forward(
     now_attn_output = attn_output[0, :, -1, :]
 
     # ---------- VHR / A-VHR head re-weighting ----------
-    if attn_output.shape[-2] > 1 and (not hasattr(self, "attn_output_tc") or self.attn_output_tc is None):
+    # CC-VHR uses explicit phases because it has three prefill branches.  The
+    # original two-view methods keep the legacy first-prefill/second-prefill
+    # behavior below for exact backward compatibility.
+    if (
+        score_mode != "consensus"
+        and attn_output.shape[-2] > 1
+        and getattr(self, "vhr_phase", None) == "reuse"
+    ):
+        # Symmetric VHR-VCD noisy prefill: reuse the heads selected by the
+        # clean prefill without treating this third branch as a new contrast.
+        if getattr(self, "aug_ratio_per_head", None) is not None:
+            attn_output = attn_output * self.aug_ratio_per_head
+        elif getattr(self, "aug_heads", None) is not None:
+            attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
+        else:
+            raise RuntimeError("VHR-VCD noisy prefill ran before clean head selection")
+
+    elif attn_output.shape[-2] > 1 and getattr(self, "vhr_phase", None) == "vanilla":
+        # Self-contrast baseline prefill: keep the original attention output
+        # and do not overwrite any VHR calibration state.
+        pass
+
+    elif score_mode == "consensus" and attn_output.shape[-2] > 1:
+        phase = getattr(self, "vhr_phase", None)
+        if phase == "text":
+            self.attn_output_tc = now_attn_output
+        elif phase == "noisy":
+            self.attn_output_nc = now_attn_output
+        elif phase == "clean":
+            if getattr(self, "attn_output_tc", None) is None or getattr(self, "attn_output_nc", None) is None:
+                raise RuntimeError("CC-VHR clean prefill requires both text and noisy head summaries")
+
+            text_delta = now_attn_output.float() - self.attn_output_tc.float()
+            noise_delta = now_attn_output.float() - self.attn_output_nc.float()
+            text_strength = text_delta.norm(dim=-1)
+            noise_strength = noise_delta.norm(dim=-1)
+            alignment = torch.nn.functional.cosine_similarity(text_delta, noise_delta, dim=-1, eps=1e-6)
+            harmonic_strength = (
+                2.0 * text_strength * noise_strength / (text_strength + noise_strength + 1e-6)
+            )
+            scores = alignment * harmonic_strength
+
+            if filter and text_strength.std() > 1:
+                text_activity = self.attn_output_tc.float().pow(2).sum(-1)
+                outliers = (
+                    (text_strength > text_strength.mean() + text_strength.std())
+                    & (text_activity > text_activity.mean() + text_activity.std())
+                )
+                scores = scores.masked_fill(outliers, -float("inf"))
+
+            if not 0 < head_fraction <= 1:
+                raise ValueError(f"head_fraction must be in (0, 1], got {head_fraction}")
+            max_heads = max(1, min(scores.numel(), math.ceil(scores.numel() * head_fraction)))
+            if positive_only:
+                eligible = (scores > 0).nonzero().flatten()
+                if eligible.numel() == 0:
+                    self.aug_heads = scores.argmax().view(1)
+                else:
+                    k = min(max_heads, eligible.numel())
+                    self.aug_heads = eligible[torch.topk(scores[eligible], k=k).indices]
+            else:
+                self.aug_heads = torch.topk(scores, k=max_heads).indices
+            self.aug_ratio_per_head = None
+            self.attn_output_tc = None
+            self.attn_output_nc = None
+            attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
+        else:
+            raise RuntimeError(f"Unknown CC-VHR prefill phase: {phase!r}")
+
+    elif attn_output.shape[-2] > 1 and (not hasattr(self, "attn_output_tc") or self.attn_output_tc is None):
         # 第一次 prefill：缓存 text-contrast 路径的最后一个 token 表示
         self.attn_output_tc = now_attn_output
 
     elif attn_output.shape[-2] > 1:
         # 第二次 prefill：基于两次 prefill 计算 head_vary，决定本步以及后续 decoding 的加权
-        head_vary = ((self.attn_output_tc - now_attn_output) ** 2).sum(-1)
+        text_attn_output = self.attn_output_tc
+        head_delta = now_attn_output - text_attn_output
+        head_vary = (head_delta ** 2).sum(-1)
         if head_vary.std() > 1 and filter:
             aotc = (self.attn_output_tc ** 2).sum(-1)
             head_vary[(head_vary > (head_vary.mean() + head_vary.std())) & (aotc > (aotc.mean() + aotc.std()))] = 0
@@ -132,16 +208,70 @@ def vhr_forward(
             self.aug_heads = None  # 标记走 A-VHR 分支
             attn_output = attn_output * ratio
         else:
-            self.aug_heads = (head_vary > head_vary.median()).nonzero().flatten()
+            if score_mode in {"directional", "directional_linear", "delayed_directional_linear", "calibrated"}:
+                num_heads = head_delta.shape[0]
+                o_proj_blocks = self.o_proj.weight.float().view(self.o_proj.out_features, num_heads, self.head_dim)
+                projected_delta = torch.einsum("hd,ohd->ho", head_delta.float(), o_proj_blocks)
+                visual_residual = projected_delta.sum(dim=0)
+                alignment = torch.nn.functional.cosine_similarity(
+                    projected_delta,
+                    visual_residual.unsqueeze(0),
+                    dim=-1,
+                    eps=1e-6,
+                )
+                head_strength = head_delta.float().norm(dim=-1)
+                if score_mode in {"directional_linear", "delayed_directional_linear"}:
+                    scores = alignment * head_strength
+                else:
+                    scores = alignment * torch.log1p(head_strength)
+                scores = scores.masked_fill(head_vary == 0, -float("inf"))
+            else:
+                scores = head_vary.float()
+
+            if score_mode == "delayed_directional_linear":
+                baseline_heads = (head_vary > head_vary.median()).nonzero().flatten()
+                max_heads = max(1, min(scores.numel(), math.ceil(scores.numel() * head_fraction)))
+                eligible = (scores > 0).nonzero().flatten() if positive_only else torch.arange(scores.numel(), device=scores.device)
+                if eligible.numel() == 0:
+                    directional_heads = scores.argmax().view(1)
+                else:
+                    k = min(max_heads, eligible.numel())
+                    directional_heads = eligible[torch.topk(scores[eligible], k=k).indices]
+                self.aug_heads = baseline_heads
+                self.vhr_baseline_heads = baseline_heads
+                self.vhr_directional_heads = directional_heads
+                self.vhr_directional_active = False
+            elif score_mode == "calibrated":
+                baseline_heads = head_vary > head_vary.median()
+                eligible = (baseline_heads & (alignment > 0)).nonzero().flatten()
+                self.aug_heads = eligible if eligible.numel() > 0 else baseline_heads.nonzero().flatten()
+            elif score_mode == "magnitude" and head_fraction == 0.5 and not positive_only:
+                self.aug_heads = (head_vary > head_vary.median()).nonzero().flatten()
+            else:
+                if not 0 < head_fraction <= 1:
+                    raise ValueError(f"head_fraction must be in (0, 1], got {head_fraction}")
+                max_heads = max(1, min(scores.numel(), math.ceil(scores.numel() * head_fraction)))
+                if positive_only:
+                    eligible = (scores > 0).nonzero().flatten()
+                    if eligible.numel() == 0:
+                        self.aug_heads = scores.argmax().view(1)
+                    else:
+                        k = min(max_heads, eligible.numel())
+                        self.aug_heads = eligible[torch.topk(scores[eligible], k=k).indices]
+                else:
+                    self.aug_heads = torch.topk(scores, k=max_heads).indices
             self.aug_ratio_per_head = None
             attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
 
-    elif attn_output.shape[-2] == 1:
+    elif attn_output.shape[-2] == 1 and getattr(self, "vhr_phase", None) != "vanilla":
         # decoding 步：复用 prefill 时计算好的加权
         if getattr(self, "aug_ratio_per_head", None) is not None:
             attn_output = attn_output * self.aug_ratio_per_head
         elif getattr(self, "aug_heads", None) is not None:
-            attn_output[:, self.aug_heads, :, :] = aug_ratio * attn_output[:, self.aug_heads, :, :]
+            active_heads = self.aug_heads
+            if getattr(self, "vhr_directional_active", False) and getattr(self, "vhr_directional_heads", None) is not None:
+                active_heads = self.vhr_directional_heads
+            attn_output[:, active_heads, :, :] = aug_ratio * attn_output[:, active_heads, :, :]
     
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.view(bsz, q_len, -1)
@@ -170,6 +300,9 @@ def replace_attn(
     target_layers=None,
     aug_ratio=2,
     filter=False,
+    score_mode="magnitude",
+    head_fraction=0.5,
+    positive_only=False,
     use_avhr=False,
     avhr_tau=1.0,
     avhr_alpha=0.5,
@@ -198,6 +331,9 @@ def replace_attn(
                 layer.self_attn,
                 aug_ratio=aug_ratio,
                 filter=filter,
+                score_mode=score_mode,
+                head_fraction=head_fraction,
+                positive_only=positive_only,
                 use_avhr=use_avhr,
                 avhr_tau=avhr_tau,
                 avhr_rho_max=avhr_rho_max,
@@ -205,7 +341,33 @@ def replace_attn(
             )
             # 清空可能残留的状态
             layer.self_attn.attn_output_tc = None
+            layer.self_attn.attn_output_nc = None
             layer.self_attn.aug_heads = None
             layer.self_attn.aug_ratio_per_head = None
+            layer.self_attn.vhr_baseline_heads = None
+            layer.self_attn.vhr_directional_heads = None
+            layer.self_attn.vhr_directional_active = False
+            layer.self_attn.vhr_phase = None
         else:
             layer.self_attn.forward = partial(forward, layer.self_attn)
+            layer.self_attn.attn_output_tc = None
+            layer.self_attn.attn_output_nc = None
+            layer.self_attn.aug_heads = None
+            layer.self_attn.aug_ratio_per_head = None
+            layer.self_attn.vhr_baseline_heads = None
+            layer.self_attn.vhr_directional_heads = None
+            layer.self_attn.vhr_directional_active = False
+            layer.self_attn.vhr_phase = None
+
+
+def set_directional_active(model, active):
+    for layer in get_layers(model):
+        attention = layer.self_attn
+        if getattr(attention, "vhr_directional_heads", None) is not None:
+            attention.vhr_directional_active = active
+
+
+def set_vhr_phase(model, phase):
+    """Set the explicit prefill/decode branch used by multi-view VHR modes."""
+    for layer in get_layers(model):
+        layer.self_attn.vhr_phase = phase

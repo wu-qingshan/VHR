@@ -1,11 +1,19 @@
 import copy
+import math
 import torch
 import transformers
 from transformers.generation.utils import *
-from transformers.generation.utils import _split_model_inputs
+try:
+    from transformers.generation.utils import _split_model_inputs  # transformers <= 4.50
+except ImportError:  # 新版 transformers (>=4.51) 已移除该私有符号
+    def _split_model_inputs(*args, **kwargs):  # type: ignore[no-redef]
+        raise NotImplementedError(
+            "_split_model_inputs is unavailable in current transformers version; "
+            "this branch is only used by low_memory beam_search and is not needed for VHR."
+        )
 from transformers.generation.configuration_utils import *
 
-from vhr import replace_attn as replace_attn_vhr
+from vhr import replace_attn as replace_attn_vhr, set_directional_active, set_vhr_phase
 
 __version__ = "4.45.0"
 
@@ -71,6 +79,18 @@ def _vhr_decoding(
     do_sample = generation_config.do_sample
     image_start = generation_config.vhr_image_start
     image_end = generation_config.vhr_image_end
+    contrast_mode = generation_config.vhr_contrast_mode
+    score_mode = generation_config.vhr_score_mode
+    directional_delay = generation_config.vhr_directional_delay
+    images_noisy = generation_config.vhr_images_noisy
+    images_cd = generation_config.images_cd
+    use_vcd = images_cd is not None
+    use_base_contrast = generation_config.vhr_base_contrast
+    use_aux_contrast = use_vcd or use_base_contrast
+    if use_vcd and use_base_contrast:
+        raise ValueError("Choose either noisy-image VCD or VHR self-contrast, not both")
+    if use_vcd and score_mode == "consensus":
+        raise ValueError("Full VCD is not supported with the abandoned CC-VHR consensus score")
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -88,14 +108,18 @@ def _vhr_decoding(
 
     # keep track of which sequences are already finished
     batch_size, cur_len = input_ids.shape
+    prompt_length = cur_len
     this_peer_finished = False
     unfinished_sequences = torch.ones(batch_size, dtype=torch.long, device=input_ids.device)
     model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
     model_kwargs_tc = None
+    model_kwargs_cd = None
 
     while self._has_unfinished_sequences(
         this_peer_finished, synced_gpus, device=input_ids.device, cur_len=cur_len, max_length=max_length
     ):
+        if score_mode == "delayed_directional_linear":
+            set_directional_active(self, cur_len - prompt_length >= directional_delay)
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
         if model_kwargs_tc is None:
@@ -103,28 +127,73 @@ def _vhr_decoding(
             model_kwargs_tc = copy.deepcopy(model_kwargs)
 
             if image_start > 0:
-                model_kwargs_tc['pixel_values'] = None
-                model_kwargs_tc['image_sizes'] = None
-                input_ids_tc = torch.cat((input_ids_tc[:, :image_start], input_ids_tc[:, image_end:]), dim=1)
-                attention_mask = model_kwargs_tc['attention_mask']
-                model_kwargs_tc['attention_mask'] = torch.cat((attention_mask[:, :image_start], attention_mask[:, image_end:]), dim=1)
+                if contrast_mode == "zero":
+                    model_kwargs_tc['pixel_values'] = torch.zeros_like(model_kwargs_tc['pixel_values'])
+                else:
+                    model_kwargs_tc['pixel_values'] = None
+                    model_kwargs_tc['image_sizes'] = None
+                    input_ids_tc = torch.cat((input_ids_tc[:, :image_start], input_ids_tc[:, image_end:]), dim=1)
+                    attention_mask = model_kwargs_tc['attention_mask']
+                    model_kwargs_tc['attention_mask'] = torch.cat((attention_mask[:, :image_start], attention_mask[:, image_end:]), dim=1)
             else:
                 # instructBLIP generation
-                model_kwargs_tc['inputs_embeds'] = model_kwargs_tc['inputs_embeds'][:, 32:]
-                model_kwargs_tc['attention_mask'] = model_kwargs_tc['attention_mask'][:, 32:]
+                if contrast_mode == "zero":
+                    model_kwargs_tc['inputs_embeds'] = model_kwargs_tc['inputs_embeds'].clone()
+                    model_kwargs_tc['inputs_embeds'][:, :32] = 0
+                else:
+                    model_kwargs_tc['inputs_embeds'] = model_kwargs_tc['inputs_embeds'][:, 32:]
+                    model_kwargs_tc['attention_mask'] = model_kwargs_tc['attention_mask'][:, 32:]
             
             model_kwargs_tc = self._get_initial_cache_position(input_ids_tc, model_kwargs_tc)
 
             model_inputs_tc = self.prepare_inputs_for_generation(input_ids_tc, **model_kwargs_tc)
 
             # forward pass to store the attn_outputs of the text contrast inputs
+            if score_mode == "consensus":
+                set_vhr_phase(self, "text")
             outputs_tc = self(**model_inputs_tc, return_dict=True)
+
+            if score_mode == "consensus":
+                if images_noisy is None:
+                    raise ValueError("CC-VHR requires `vhr_images_noisy`")
+                model_kwargs_nc = copy.deepcopy(model_kwargs)
+                if "pixel_values" in model_kwargs_nc:
+                    model_kwargs_nc["pixel_values"] = images_noisy
+                else:
+                    num_query_tokens = images_noisy.shape[1]
+                    model_kwargs_nc["inputs_embeds"] = torch.cat(
+                        [images_noisy, model_kwargs_nc["inputs_embeds"][:, num_query_tokens:]], dim=1
+                    )
+                model_kwargs_nc = self._get_initial_cache_position(input_ids, model_kwargs_nc)
+                model_inputs_nc = self.prepare_inputs_for_generation(input_ids, **model_kwargs_nc)
+                set_vhr_phase(self, "noisy")
+                outputs_nc = self(**model_inputs_nc, return_dict=True)
+                del outputs_nc
+            del outputs_tc
+
+            if use_vcd:
+                model_kwargs_cd = copy.deepcopy(model_kwargs)
+                if "pixel_values" in model_kwargs_cd:
+                    model_kwargs_cd["pixel_values"] = images_cd
+                else:
+                    num_query_tokens = images_cd.shape[1]
+                    model_kwargs_cd["inputs_embeds"] = torch.cat(
+                        [images_cd, model_kwargs_cd["inputs_embeds"][:, num_query_tokens:]], dim=1
+                    )
+                model_kwargs_cd = self._get_initial_cache_position(input_ids, model_kwargs_cd)
+            elif use_base_contrast:
+                model_kwargs_cd = copy.deepcopy(model_kwargs)
+                model_kwargs_cd = self._get_initial_cache_position(input_ids, model_kwargs_cd)
 
         # prepare variable output controls (note: some models won't accept all output controls)
         model_inputs.update({"output_attentions": output_attentions} if output_attentions else {})
         model_inputs.update({"output_hidden_states": output_hidden_states} if output_hidden_states else {})
 
         # forward pass to get next token
+        if score_mode == "consensus":
+            set_vhr_phase(self, "clean" if cur_len == prompt_length else "decode")
+        elif use_base_contrast:
+            set_vhr_phase(self, "clean" if cur_len == prompt_length else "decode")
         outputs = self(**model_inputs, return_dict=True)
 
         if synced_gpus and this_peer_finished:
@@ -134,8 +203,24 @@ def _vhr_decoding(
         # (the clone itself is always small)
         next_token_logits = outputs.logits.clone()[:, -1, :].float()
 
-        # pre-process distribution
-        next_token_scores = logits_processor(input_ids, next_token_logits)
+        if use_aux_contrast:
+            model_inputs_cd = self.prepare_inputs_for_generation(input_ids, **model_kwargs_cd)
+            model_inputs_cd.update({"output_attentions": output_attentions} if output_attentions else {})
+            model_inputs_cd.update({"output_hidden_states": output_hidden_states} if output_hidden_states else {})
+            set_vhr_phase(self, "reuse" if use_vcd else "vanilla")
+            outputs_cd = self(**model_inputs_cd, return_dict=True)
+            next_token_logits_cd = outputs_cd.logits.clone()[:, -1, :].float()
+
+            contrast_alpha = generation_config.cd_alpha if use_vcd else generation_config.vhr_logit_alpha
+            contrast_beta = generation_config.cd_beta if use_vcd else generation_config.vhr_logit_beta
+            cutoff = math.log(contrast_beta) + next_token_logits.max(dim=-1, keepdim=True).values
+            contrasted_logits = (
+                (1 + contrast_alpha) * next_token_logits - contrast_alpha * next_token_logits_cd
+            )
+            contrasted_logits = contrasted_logits.masked_fill(next_token_logits < cutoff, -float("inf"))
+            next_token_scores = logits_processor(input_ids, contrasted_logits)
+        else:
+            next_token_scores = logits_processor(input_ids, next_token_logits)
 
         # Store scores, attentions and hidden_states when required
         if return_dict_in_generate:
@@ -177,6 +262,12 @@ def _vhr_decoding(
             model_kwargs,
             is_encoder_decoder=self.config.is_encoder_decoder,
         )
+        if use_aux_contrast:
+            model_kwargs_cd = self._update_model_kwargs_for_generation(
+                outputs_cd,
+                model_kwargs_cd,
+                is_encoder_decoder=self.config.is_encoder_decoder,
+            )
         # stop when each sentence is finished
         unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
         this_peer_finished = unfinished_sequences.max() == 0
@@ -185,6 +276,8 @@ def _vhr_decoding(
         # This is needed to properly delete outputs.logits which may be very large for first iteration
         # Otherwise a reference to outputs is kept which keeps the logits alive in the next iteration
         del outputs
+        if use_aux_contrast:
+            del outputs_cd
 
     if streamer is not None:
         streamer.end()
@@ -1375,20 +1468,25 @@ def generate(
                          target_layers=generation_config.vhr_layers,
                          aug_ratio=generation_config.vhr_aug_ratio,
                          filter=generation_config.vhr_filter,
+                         score_mode=generation_config.vhr_score_mode,
+                         head_fraction=generation_config.vhr_head_fraction,
+                         positive_only=generation_config.vhr_positive_only,
                          use_avhr=generation_config.vhr_use_avhr,
                          avhr_tau=generation_config.vhr_tau,
                          avhr_alpha=generation_config.vhr_alpha,
                          avhr_rho_max=generation_config.vhr_rho_max)
-        result = self._vhr_decoding(
-            input_ids,
-            logits_processor=prepared_logits_processor,
-            stopping_criteria=prepared_stopping_criteria,
-            generation_config=generation_config,
-            synced_gpus=synced_gpus,
-            streamer=streamer,
-            **model_kwargs,
-        )
-        replace_attn_vhr(self)
+        try:
+            result = self._vhr_decoding(
+                input_ids,
+                logits_processor=prepared_logits_processor,
+                stopping_criteria=prepared_stopping_criteria,
+                generation_config=generation_config,
+                synced_gpus=synced_gpus,
+                streamer=streamer,
+                **model_kwargs,
+            )
+        finally:
+            replace_attn_vhr(self)
     elif generation_mode == GenerationMode.DOLA_GENERATION:
         if self._is_stateful:
             # DoLa decoding was not designed for stateful models, and would require some changes
@@ -1765,8 +1863,17 @@ def generation_config_init(self, **kwargs):
     self.vhr_layers = kwargs.pop("vhr_layers", None)
     self.vhr_aug_ratio = kwargs.pop("vhr_aug_ratio", 1.)
     self.vhr_filter = kwargs.pop("vhr_filter", False)
+    self.vhr_score_mode = kwargs.pop("vhr_score_mode", "magnitude")
+    self.vhr_head_fraction = kwargs.pop("vhr_head_fraction", 0.5)
+    self.vhr_positive_only = kwargs.pop("vhr_positive_only", False)
+    self.vhr_contrast_mode = kwargs.pop("vhr_contrast_mode", "remove")
+    self.vhr_directional_delay = kwargs.pop("vhr_directional_delay", 64)
     self.vhr_image_start = kwargs.pop("vhr_image_start", None)
     self.vhr_image_end = kwargs.pop("vhr_image_end", None)
+    self.vhr_images_noisy = kwargs.pop("vhr_images_noisy", None)
+    self.vhr_base_contrast = kwargs.pop("vhr_base_contrast", False)
+    self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
+    self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters
     self.vhr_use_avhr = kwargs.pop("vhr_use_avhr", False)
     self.vhr_tau = kwargs.pop("vhr_tau", 1.0)
@@ -1900,7 +2007,11 @@ def get_generation_mode(self, assistant_model: Optional["PreTrainedModel"] = Non
 
     # VCD generation
     if self.images_cd is not None:
-        if generation_mode in ("greedy_search", "sample"):
+        if generation_mode == GenerationMode.VHR_GENERATION:
+            # Symmetric VHR-VCD is executed by the VHR loop so that both
+            # clean and noisy branches reuse exactly the same selected heads.
+            pass
+        elif generation_mode in ("greedy_search", "sample"):
             generation_mode = GenerationMode.VCD_GENERATION
         
         else:

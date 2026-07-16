@@ -1,6 +1,11 @@
+from typing import Optional, Tuple, Union, List
+
 import torch
 
 from transformers.models.instructblip.modeling_instructblip import *
+from transformers.models.instructblip.modeling_instructblip import (
+    InstructBlipForConditionalGenerationModelOutput,
+)
 from transformers import AutoProcessor, LlavaForConditionalGeneration, LlavaNextProcessor, \
     LlavaNextForConditionalGeneration, InstructBlipProcessor, InstructBlipForConditionalGeneration
 
@@ -217,7 +222,7 @@ def replace_instructblip_forward():
     InstructBlipForConditionalGeneration.forward = instructBLIP_forward
 
 
-def add_diffusion_noise(image_tensor, noise_step):
+def add_diffusion_noise(image_tensor, noise_step, generator=None):
     num_steps = 1000  # Number of diffusion steps
 
     # decide beta in each step
@@ -233,9 +238,9 @@ def add_diffusion_noise(image_tensor, noise_step):
     one_minus_alphas_bar_sqrt = torch.sqrt(1 - alphas_prod)
 
     def q_x(x_0,t):
-        noise = torch.randn_like(x_0)
-        alphas_t = alphas_bar_sqrt[t]
-        alphas_1_m_t = one_minus_alphas_bar_sqrt[t]
+        noise = torch.randn(x_0.shape, dtype=x_0.dtype, device=x_0.device, generator=generator)
+        alphas_t = alphas_bar_sqrt[t].to(device=x_0.device, dtype=x_0.dtype)
+        alphas_1_m_t = one_minus_alphas_bar_sqrt[t].to(device=x_0.device, dtype=x_0.dtype)
         return (alphas_t*x_0 + alphas_1_m_t*noise)
 
     noise_delta = int(noise_step) # from 0-999

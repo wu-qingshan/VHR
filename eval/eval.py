@@ -155,7 +155,14 @@ if __name__ == "__main__":
         all_chairs = []
         all_chairi = []
 
-        for result_file in glob.glob(args.result_file):
+        chair_files = glob.glob(args.result_file)
+        if not chair_files:
+            raise SystemExit(
+                f"[eval_chair] No result files matched pattern: {args.result_file}\n"
+                f"Inference likely did not finish or files were not merged."
+            )
+
+        for result_file in chair_files:
             print(f"Evaluating {result_file} ...")
             eval_chair(result_file)
             subset = result_file.replace('chair', 'chairmetrics')
@@ -181,8 +188,15 @@ if __name__ == "__main__":
         ))
 
     elif args.eval_pope:
+        pope_files = glob.glob(args.result_file)
+        if not pope_files:
+            raise SystemExit(
+                f"[eval_pope] No result files matched pattern: {args.result_file}\n"
+                f"Inference likely did not finish or files were not merged."
+            )
+
         avg_results = 0
-        for result_file in glob.glob(args.result_file):
+        for result_file in pope_files:
             print(f"Evaluating {result_file} ...")
             answers = [json.loads(d) for d in open(result_file, "r")]
             answers_list = {a['question_id']: a['text'] for a in answers}
@@ -192,7 +206,7 @@ if __name__ == "__main__":
             results = np.round(np.multiply(np.array(result), 100), decimals=2)
             print("Acc\tPrec\tRec\tF1\tYesRate")
             print("%.2f\t%.2f\t%.2f\t%.2f\t%.2f" % tuple(results))
-            avg_results += results / 3
+            avg_results += results / len(pope_files)
         print("------------------------------------")
         print("Acc\tPrec\tRec\tF1\tYesRate")
         print("%.2f\t%.2f\t%.2f\t%.2f\t%.2f" % tuple(avg_results))

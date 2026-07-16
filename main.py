@@ -33,9 +33,26 @@ def argument_parser():
     parser.add_argument("--vhr_tau", default=1.0, type=float, help="A-VHR sigmoid 温度（越小越接近原版硬阈值）")
     parser.add_argument("--vhr_alpha", default=0.5, type=float, help="A-VHR 层深衰减强度，0 表示不衰减")
     parser.add_argument("--vhr_rho_max", default=2.0, type=float, help="A-VHR 单 head 最大加权倍率")
+    parser.add_argument("--vhr_score_mode", default="magnitude", choices=["magnitude", "directional", "directional_linear", "delayed_directional_linear", "calibrated", "consensus"], help="head selection score used by VHR")
+    parser.add_argument("--vhr_head_fraction", default=0.5, type=float, help="fraction of heads selected in each VHR layer")
+    parser.add_argument("--vhr_positive_only", action="store_true", default=False, help="only select heads with a positive directional score")
+    parser.add_argument("--vhr_binary_fallback", action="store_true", default=False, help="use original magnitude VHR for binary questions")
+    parser.add_argument("--vhr_contrast_mode", default="remove", choices=["remove", "zero"], help="visual counterfactual used to score heads")
+    parser.add_argument("--vhr_directional_delay", default=64, type=int, help="generated tokens before switching from magnitude to directional heads")
+    parser.add_argument("--vhr_noise_step", default=500, type=int, help="diffusion noise step used by CC-VHR's noisy counterfactual")
+    parser.add_argument("--cd_alpha", default=0.5, type=float, help="VCD contrast strength")
+    parser.add_argument("--cd_beta", default=0.1, type=float, help="VCD plausibility cutoff ratio")
+    parser.add_argument("--vhr_logit_alpha", default=0.5, type=float, help="Self-Contrast VHR logit contrast strength")
+    parser.add_argument("--vhr_logit_beta", default=0.1, type=float, help="Self-Contrast VHR plausibility cutoff ratio")
     parser.add_argument("--max_new_tokens", default=512, type=int, help="max new tokens to generate")
+    parser.add_argument("--no_repeat_ngram_size", default=0, type=int, help="standard generation no-repeat ngram constraint")
+    parser.add_argument("--repetition_penalty", default=1.0, type=float, help="standard generation repetition penalty")
     parser.add_argument("--seed", default=0, type=int, help="random seed")
     parser.add_argument("--output_dir", default="results", type=str, help="output directory")
+    parser.add_argument("--datasets", default="chair,pope_popular,pope_adversarial,pope_random", type=str, help="comma-separated datasets to infer")
+    parser.add_argument("--chair_seeds", default="0,1,2,3,4", type=str, help="comma-separated CHAIR seeds")
+    parser.add_argument("--chair_samples", default=500, type=int, help="number of randomly sampled CHAIR images")
+    parser.add_argument("--chair_ids_file", default=None, type=str, help="optional JSON file containing fixed COCO image ids")
     return parser
 
 
@@ -54,6 +71,8 @@ class HallucinationTest:
         self.num_chunks = args.num_chunks
         self.method = args.method
         self.max_new_tokens = args.max_new_tokens
+        self.no_repeat_ngram_size = args.no_repeat_ngram_size
+        self.repetition_penalty = args.repetition_penalty
 
         self.vhr_aug_ratio = args.vhr_aug_ratio
         self.vhr_layers = args.vhr_layers
@@ -62,6 +81,22 @@ class HallucinationTest:
         self.vhr_tau = args.vhr_tau
         self.vhr_alpha = args.vhr_alpha
         self.vhr_rho_max = args.vhr_rho_max
+        self.vhr_score_mode = args.vhr_score_mode
+        self.vhr_head_fraction = args.vhr_head_fraction
+        self.vhr_positive_only = args.vhr_positive_only
+        self.vhr_binary_fallback = args.vhr_binary_fallback
+        self.vhr_contrast_mode = args.vhr_contrast_mode
+        self.vhr_directional_delay = args.vhr_directional_delay
+        self.vhr_noise_step = args.vhr_noise_step
+        self.cd_alpha = args.cd_alpha
+        self.cd_beta = args.cd_beta
+        self.vhr_logit_alpha = args.vhr_logit_alpha
+        self.vhr_logit_beta = args.vhr_logit_beta
+        self.chair_samples = args.chair_samples
+        self.chair_ids = None
+        if args.chair_ids_file is not None:
+            with open(args.chair_ids_file, "r") as f:
+                self.chair_ids = json.load(f)
     
     def infer_dataset(self, dataset_name, seed):
         output_file_path = f"{self.output_dir}/{self.model_name}/{self.chunk_idx}-{dataset_name}_{seed}-{self.method}-{self.max_new_tokens}.json"
@@ -73,12 +108,17 @@ class HallucinationTest:
 
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
         random.seed(seed)
-        dataset = load_dataset(dataset_name)    
+        if dataset_name == "chair":
+            dataset = CHAIRBench(num_samples=self.chair_samples, image_ids=self.chair_ids)
+        else:
+            dataset = load_dataset(dataset_name)
 
         generate_kwargs = {
             "num_beams": 5 if "beam" in self.method else 1, 
             "do_sample": "sample" in self.method,
             "max_new_tokens": self.max_new_tokens,
+            "no_repeat_ngram_size": self.no_repeat_ngram_size,
+            "repetition_penalty": self.repetition_penalty,
         }
         
         if "vhr" in self.method:
@@ -90,8 +130,20 @@ class HallucinationTest:
                     "vhr_aug_ratio": self.vhr_aug_ratio,
                     "vhr_layers": vhr_layers,
                     "vhr_filter": self.vhr_filter,
+                    "vhr_score_mode": self.vhr_score_mode,
+                    "vhr_head_fraction": self.vhr_head_fraction,
+                    "vhr_positive_only": self.vhr_positive_only,
+                    "vhr_contrast_mode": self.vhr_contrast_mode,
+                    "vhr_directional_delay": self.vhr_directional_delay,
                 }
             )
+            if "csvhr" in self.method:
+                generate_kwargs.update(
+                    {
+                        "vhr_score_mode": "directional",
+                        "vhr_positive_only": True,
+                    }
+                )
             # 若 method 含 "avhr"，启用 A-VHR：连续 sigmoid 头加权 + 层深衰减
             if "avhr" in self.method:
                 generate_kwargs.update(
@@ -100,6 +152,14 @@ class HallucinationTest:
                         "vhr_tau": self.vhr_tau,
                         "vhr_alpha": self.vhr_alpha,
                         "vhr_rho_max": self.vhr_rho_max,
+                    }
+                )
+            if "scvhr" in self.method:
+                generate_kwargs.update(
+                    {
+                        "vhr_base_contrast": True,
+                        "vhr_logit_alpha": self.vhr_logit_alpha,
+                        "vhr_logit_beta": self.vhr_logit_beta,
                     }
                 )
         elif "dola" in self.method:
@@ -119,25 +179,68 @@ class HallucinationTest:
 
             # prepare for inputs
             img, qu, gt = dataset[qid]
+            if "vhr" in self.method:
+                generate_kwargs["vhr_score_mode"] = self.vhr_score_mode
+                generate_kwargs["vhr_head_fraction"] = self.vhr_head_fraction
+                generate_kwargs["vhr_positive_only"] = self.vhr_positive_only
+                if "csvhr" in self.method:
+                    generate_kwargs["vhr_score_mode"] = "directional"
+                    generate_kwargs["vhr_positive_only"] = True
+                if self.vhr_binary_fallback and is_binary_question(qu):
+                    generate_kwargs["vhr_score_mode"] = "magnitude"
+                    generate_kwargs["vhr_head_fraction"] = 0.5
+                    generate_kwargs["vhr_positive_only"] = False
             prompt = self.template.format(question=qu)
             inputs = self.processor(text=prompt, images=img, return_tensors="pt")
             inputs = {key: value.to(self.device) for key, value in inputs.items()}
             img_start, img_end, respond_start, img_token_end = self.get_image_position(inputs['input_ids'])
 
+            if "vhr" in self.method:
+                generate_kwargs.update(
+                    {
+                        "vhr_image_start": img_start,
+                        "vhr_image_end": img_token_end,
+                    }
+                )
+
+            if generate_kwargs.get("vhr_score_mode") == "consensus":
+                noise_seed = (int(seed) * 1_000_003 + int(qid)) % (2**63 - 1)
+                noise_generator = torch.Generator(device=inputs["pixel_values"].device)
+                noise_generator.manual_seed(noise_seed)
+                images_noisy = add_diffusion_noise(
+                    inputs["pixel_values"], noise_step=self.vhr_noise_step, generator=noise_generator
+                ).to(self.device)
+
+                if "instructblip" in self.model_name:
+                    inputs_noisy = copy.deepcopy(inputs)
+                    inputs_noisy["pixel_values"] = images_noisy
+                    with torch.inference_mode():
+                        query_output = self.model(**inputs_noisy).qformer_outputs[0][
+                            :, : self.model.query_tokens.size(1), :
+                        ]
+                        images_noisy = self.model.language_projection(query_output)
+                generate_kwargs["vhr_images_noisy"] = images_noisy
+
             if "vcd" in self.method:
-                images_cd = add_diffusion_noise(inputs["pixel_values"], noise_step=500)
+                noise_seed = (int(seed) * 1_000_003 + int(qid)) % (2**63 - 1)
+                noise_generator = torch.Generator(device=inputs["pixel_values"].device)
+                noise_generator.manual_seed(noise_seed)
+                images_cd = add_diffusion_noise(inputs["pixel_values"], noise_step=500, generator=noise_generator)
                 images_cd = images_cd.to(self.device)
                 
                 if "instructblip" in self.model_name:
                     inputs_cd = copy.deepcopy(inputs)
                     inputs_cd['pixel_values'] = images_cd
-                    query_output = self.model(**inputs_cd).qformer_outputs[0][:, : self.model.query_tokens.size(1), :]
-                    images_cd = self.model.language_projection(query_output)
+                    with torch.inference_mode():
+                        query_output = self.model(**inputs_cd).qformer_outputs[0][:, : self.model.query_tokens.size(1), :]
+                        images_cd = self.model.language_projection(query_output)
 
                 generate_kwargs.update(
                     {
                         "num_beams": 1,
                         "images_cd": images_cd,
+                        "cd_alpha": self.cd_alpha,
+                        "cd_beta": self.cd_beta,
                     }
                 )
 
@@ -177,15 +280,7 @@ class HallucinationTest:
                 )
 
             elif "eah" in self.method:
-                replace_attention_with_eah(hal_test.model, beta=0.002, img_start=img_start, img_end=img_end-1, layers_to_modify=[1])
-
-            elif "vhr" in self.method:
-                generate_kwargs.update(
-                    {
-                        "vhr_image_start": img_start,       # start in input_ids
-                        "vhr_image_end": img_token_end,     # end in input_ids
-                    }
-                )
+                replace_attention_with_eah(self.model, beta=0.002, img_start=img_start, img_end=img_end-1, layers_to_modify=[1])
 
             inputs = {key: value.to(self.device) for key, value in inputs.items()}
            
@@ -238,15 +333,28 @@ def load_dataset(dataset_name):
     return dataset
 
 
+def is_binary_question(question):
+    normalized = question.strip().lower()
+    binary_prefixes = (
+        "is ", "are ", "was ", "were ", "do ", "does ", "did ",
+        "can ", "could ", "has ", "have ", "will ", "would ",
+    )
+    return normalized.startswith(binary_prefixes)
+
+
 if __name__ == "__main__":
     args = argument_parser().parse_args()
 
     hal_test = HallucinationTest(args)
     
-    for seed in range(5):
-        hal_test.infer_dataset("chair", seed)
+    datasets_to_run = [dataset.strip() for dataset in args.datasets.split(",") if dataset.strip()]
+    if "chair" in datasets_to_run:
+        chair_seeds = [int(seed.strip()) for seed in args.chair_seeds.split(",") if seed.strip()]
+        for seed in chair_seeds:
+            hal_test.infer_dataset("chair", seed)
 
-    for dataset in ["pope_popular", "pope_adversarial", "pope_random"]:
-        hal_test.infer_dataset(dataset, 0)
+    for dataset in datasets_to_run:
+        if dataset != "chair":
+            hal_test.infer_dataset(dataset, 0)
 
     # hal_test.infer_dataset("llava_wild", 0)

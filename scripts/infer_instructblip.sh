@@ -1,8 +1,8 @@
 model_dir=models--Salesforce--instructblip-vicuna-7b
-model_path="/path/to/model_cache/$model_dir"
+model_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/models/instructblip-vicuna-7b"
 
 max_new_tokens=512
-vhr_layers=14
+vhr_layers=18
 
 method=$1
 

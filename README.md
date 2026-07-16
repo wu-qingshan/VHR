@@ -2,6 +2,8 @@
 
 Official implementation of our paper "Cracking the Code of Hallucination in LVLMs with Vision-aware Head Divergence" in ACL 2025.
 
+**代码导读 / 分周学习讲义**（PyTorch→解码→VHR→复现评测）：见 [docs/study/README.md](docs/study/README.md)。
+
 ## Install
 ```
 conda create -n vhr python=3.10

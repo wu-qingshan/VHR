@@ -61,10 +61,17 @@ class CHAIRBench:
     annot_file = "data/coco/annotations/captions_val2014.json"
     annot_dir = "data/coco/annotations"
 
-    def __init__(self, num_samples=500, index_qid=True):
+    def __init__(self, num_samples=500, index_qid=True, image_ids=None):
         self.index_qid = index_qid
         self.coco = COCO(self.annot_file)
-        self.all = random.sample(self.coco.getImgIds(), num_samples)
+        if image_ids is None:
+            self.all = random.sample(self.coco.getImgIds(), num_samples)
+        else:
+            valid_ids = set(self.coco.getImgIds())
+            self.all = [int(image_id) for image_id in image_ids]
+            unknown_ids = [image_id for image_id in self.all if image_id not in valid_ids]
+            if unknown_ids:
+                raise ValueError(f"Unknown COCO image ids: {unknown_ids[:10]}")
         self._evaluator = None
 
     @property
@@ -113,4 +120,3 @@ if __name__ == "__main__":
     dataset = CHAIRBench(num_samples=500, index_qid=False)
     print(len(dataset))
     print(dataset[0])
-
