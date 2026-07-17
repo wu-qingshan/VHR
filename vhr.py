@@ -69,6 +69,8 @@ def vhr_forward(
     query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
     key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    content_query_states = query_states
+    content_key_states = repeat_kv(key_states, self.num_key_value_groups)
     
     if position_embeddings is None:
         logger.warning_once(
@@ -276,7 +278,7 @@ def vhr_forward(
                 active_heads = self.vhr_directional_heads
             attn_output[:, active_heads, :, :] = aug_ratio * attn_output[:, active_heads, :, :]
 
-    if saver_diagnostic and q_len == 1 and getattr(self, "vhr_phase", None) != "vanilla":
+    if saver_diagnostic and getattr(self, "vhr_phase", None) != "vanilla":
         active_heads = getattr(self, "aug_heads", None)
         if active_heads is not None and active_heads.numel() > 0:
             if saver_image_start is None or saver_image_count is None:
@@ -287,12 +289,36 @@ def vhr_forward(
                     f"Invalid SAVER image token range [{saver_image_start}, {image_end}) "
                     f"for key length {key_states.shape[-2]}"
                 )
-            selected_query = query_states[0, active_heads, -1, :].float()
-            selected_keys = key_states[0, active_heads, saver_image_start:image_end, :].float()
-            image_scores = torch.einsum("hd,hpd->hp", selected_query, selected_keys) / math.sqrt(
+            all_query = query_states[0, :, -1, :].float()
+            all_keys = key_states[0, :, saver_image_start:image_end, :].float()
+            all_image_scores = torch.einsum("hd,hpd->hp", all_query, all_keys) / math.sqrt(
                 self.head_dim
             )
-            self.vhr_saver_last_map = torch.softmax(image_scores, dim=-1).mean(dim=0).detach()
+            all_image_maps = torch.softmax(all_image_scores, dim=-1)
+            if q_len > 1:
+                self.vhr_saver_image_keys_content = content_key_states[
+                    0, :, saver_image_start:image_end, :
+                ].detach()
+            content_image_keys = getattr(self, "vhr_saver_image_keys_content", None)
+            if content_image_keys is None:
+                raise RuntimeError("SAVER content map requires clean-prefill image keys")
+            content_scores = torch.einsum(
+                "hd,hpd->hp",
+                content_query_states[0, :, -1, :].float(),
+                content_image_keys.float(),
+            ) / math.sqrt(self.head_dim)
+            content_image_maps = torch.softmax(content_scores, dim=-1)
+            image_value_norm = value_states[
+                0, :, saver_image_start:image_end, :
+            ].float().norm(dim=-1)
+            value_image_maps = all_image_maps * image_value_norm.clamp_min(1e-12)
+            value_image_maps = value_image_maps / value_image_maps.sum(
+                dim=-1, keepdim=True
+            ).clamp_min(1e-12)
+            self.vhr_saver_last_map = all_image_maps[active_heads].mean(dim=0).detach()
+            self.vhr_saver_last_all_head_map = all_image_maps.mean(dim=0).detach()
+            self.vhr_saver_last_content_map = content_image_maps[active_heads].mean(dim=0).detach()
+            self.vhr_saver_last_value_map = value_image_maps[active_heads].mean(dim=0).detach()
     
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.view(bsz, q_len, -1)
@@ -376,6 +402,10 @@ def replace_attn(
             layer.self_attn.vhr_directional_active = False
             layer.self_attn.vhr_phase = None
             layer.self_attn.vhr_saver_last_map = None
+            layer.self_attn.vhr_saver_last_all_head_map = None
+            layer.self_attn.vhr_saver_last_content_map = None
+            layer.self_attn.vhr_saver_last_value_map = None
+            layer.self_attn.vhr_saver_image_keys_content = None
         else:
             layer.self_attn.forward = partial(forward, layer.self_attn)
             layer.self_attn.attn_output_tc = None
@@ -387,6 +417,10 @@ def replace_attn(
             layer.self_attn.vhr_directional_active = False
             layer.self_attn.vhr_phase = None
             layer.self_attn.vhr_saver_last_map = None
+            layer.self_attn.vhr_saver_last_all_head_map = None
+            layer.self_attn.vhr_saver_last_content_map = None
+            layer.self_attn.vhr_saver_last_value_map = None
+            layer.self_attn.vhr_saver_image_keys_content = None
 
 
 def set_directional_active(model, active):
@@ -402,15 +436,39 @@ def set_vhr_phase(model, phase):
         layer.self_attn.vhr_phase = phase
 
 
-def collect_saver_attention_map(model):
-    """Aggregate and clear the latest per-layer selected-head image attention maps."""
-    maps = []
+def collect_saver_attention_maps(model):
+    """Aggregate and clear selected-head and all-head image attention maps."""
+    variant_maps = {
+        "selected": [],
+        "all_head": [],
+        "content": [],
+        "value": [],
+    }
     for layer in get_layers(model):
         attention = layer.self_attn
-        current = getattr(attention, "vhr_saver_last_map", None)
-        if current is not None:
-            maps.append(current)
+        selected = getattr(attention, "vhr_saver_last_map", None)
+        all_head = getattr(attention, "vhr_saver_last_all_head_map", None)
+        content = getattr(attention, "vhr_saver_last_content_map", None)
+        value = getattr(attention, "vhr_saver_last_value_map", None)
+        if selected is not None:
+            if any(item is None for item in (all_head, content, value)):
+                raise RuntimeError("SAVER map variants are incomplete")
+            variant_maps["selected"].append(selected)
+            variant_maps["all_head"].append(all_head)
+            variant_maps["content"].append(content)
+            variant_maps["value"].append(value)
             attention.vhr_saver_last_map = None
-    if not maps:
+            attention.vhr_saver_last_all_head_map = None
+            attention.vhr_saver_last_content_map = None
+            attention.vhr_saver_last_value_map = None
+    if not variant_maps["selected"]:
         return None
-    return torch.stack(maps).mean(dim=0)
+    return {
+        name: torch.stack(maps).mean(dim=0) for name, maps in variant_maps.items()
+    }
+
+
+def collect_saver_attention_map(model):
+    """Backward-compatible selected-head-only collector."""
+    maps = collect_saver_attention_maps(model)
+    return None if maps is None else maps["selected"]

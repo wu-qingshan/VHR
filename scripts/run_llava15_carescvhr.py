@@ -30,14 +30,16 @@ def parse_args():
     parser.add_argument("--dataset", choices=("chair", "pope_popular"), default="chair")
     parser.add_argument("--limit", default=100, type=int)
     parser.add_argument("--max_new_tokens", default=512, type=int)
+    parser.add_argument("--num_chunks", default=1, type=int)
+    parser.add_argument("--chunk_idx", default=0, type=int)
     return parser.parse_args()
 
 
 def build_model_args(args, method):
     return SimpleNamespace(
         model_path=args.model_path,
-        num_chunks=1,
-        chunk_idx=0,
+        num_chunks=args.num_chunks,
+        chunk_idx=args.chunk_idx,
         device=args.device,
         method=method,
         vhr_aug_ratio=2.0,
@@ -91,6 +93,10 @@ def main():
         image_ids = image_ids[: args.limit]
     elif args.limit <= 0:
         raise ValueError("limit must be positive")
+    if args.num_chunks <= 0:
+        raise ValueError("num_chunks must be positive")
+    if not 0 <= args.chunk_idx < args.num_chunks:
+        raise ValueError("chunk_idx must be in [0, num_chunks)")
 
     model_name = os.path.basename(os.path.realpath(args.model_path).rstrip(os.sep)).split("--")[-1]
     methods = [METHODS[key] for key in method_keys]
@@ -98,7 +104,7 @@ def main():
         os.path.join(
             args.output_dir,
             model_name,
-            f"0-{args.dataset}_0-{method}-{args.max_new_tokens}.json",
+            f"{args.chunk_idx}-{args.dataset}_0-{method}-{args.max_new_tokens}.json",
         )
         for method in methods
     ]
@@ -110,6 +116,8 @@ def main():
         "dataset": args.dataset,
         "ids_file": args.ids_file if args.dataset == "chair" else None,
         "sample_count": args.limit,
+        "num_chunks": args.num_chunks,
+        "chunk_idx": args.chunk_idx,
         "methods": method_keys,
         "outputs": outputs,
     }, indent=2))

@@ -3,6 +3,12 @@
 > 更新时间：2026-07-17
 > 详细全过程见 `experiment/CS-VHR.md`；原项目诊断见 `EXPERIMENT_DIAGNOSIS.md`。
 
+## 最新结论：SAVER空间定位假设被grounding gate否决
+
+SAVER已完成selected-head map、raw-image坐标、crop processor、完整prefix local base forward和状态清理诊断，但没有进入效果实验。CARE dev 100图的纯grounding诊断共8779步骤、504次SC switch；只有6次switch候选是COCO对象词。对130个真实对象token事件，selected-head pointing仅10.0%，与all-head完全一致，显著低于图像中心先验33.85%（McNemar `p=3.67e-8`）；content为6.92%，value变体最好也只有16.15%，仍显著低于中心（`p=1.17e-4`）。
+
+因此停止attention-map/crop版SAVER，不创建新效果划分、不运行CHAIR/POPE、不扫描区域参数。机制结论是VHR视觉敏感head携带的是全局视觉条件残差，而不是可靠候选实体定位器；下一方向转向在隐藏空间内平衡视觉attention残差与FFN语言先验，目标是单分支、token自适应且不依赖空间attention解释。完整记录见 `experiment/SAVER-VHR.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

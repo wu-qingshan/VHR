@@ -14,7 +14,7 @@ except ImportError:  # 新版 transformers (>=4.51) 已移除该私有符号
 from transformers.generation.configuration_utils import *
 
 from vhr import (
-    collect_saver_attention_map,
+    collect_saver_attention_maps,
     replace_attn as replace_attn_vhr,
     set_directional_active,
     set_vhr_phase,
@@ -312,9 +312,12 @@ def _vhr_decoding(
     saver_sum_abs_error = 0.0
     saver_std_sum = 0.0
     saver_bbox_area_sum = 0.0
+    saver_all_head_bbox_area_sum = 0.0
     saver_changed_steps = 0
     saver_previous_map = None
     saver_examples = []
+    saver_switch_steps = 0
+    saver_switch_examples = []
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -344,6 +347,7 @@ def _vhr_decoding(
     while self._has_unfinished_sequences(
         this_peer_finished, synced_gpus, device=input_ids.device, cur_len=cur_len, max_length=max_length
     ):
+        saver_current_summary = None
         if score_mode == "delayed_directional_linear":
             set_directional_active(self, cur_len - prompt_length >= directional_delay)
         # prepare model inputs
@@ -424,15 +428,41 @@ def _vhr_decoding(
         outputs = self(**model_inputs, return_dict=True)
 
         if use_saver_diagnostic:
-            saver_map = collect_saver_attention_map(self)
-            if saver_map is not None:
-                summary = summarize_saver_attention_map(saver_map)
+            saver_maps = collect_saver_attention_maps(self)
+            if saver_maps is not None:
+                summary = summarize_saver_attention_map(saver_maps["selected"])
                 normalized_map = summary.pop("normalized_map")
+                variant_summaries = {}
+                variant_normalized_maps = {}
+                for variant in ("all_head", "content", "value"):
+                    variant_summary = summarize_saver_attention_map(saver_maps[variant])
+                    variant_normalized_maps[variant] = variant_summary.pop("normalized_map")
+                    variant_summaries[variant] = variant_summary
+                all_head_summary = variant_summaries["all_head"]
+                all_head_normalized_map = variant_normalized_maps["all_head"]
                 saver_map_steps += 1
-                saver_finite_steps += int(torch.isfinite(normalized_map).all().item())
+                saver_finite_steps += int(
+                    torch.isfinite(normalized_map).all().item()
+                    and torch.isfinite(all_head_normalized_map).all().item()
+                )
                 saver_sum_abs_error += abs(summary["sum"] - 1.0)
                 saver_std_sum += summary["std"]
                 saver_bbox_area_sum += summary["bbox_area_fraction"]
+                saver_all_head_bbox_area_sum += all_head_summary["bbox_area_fraction"]
+                for variant, variant_summary in variant_summaries.items():
+                    summary[f"{variant}_bbox"] = variant_summary["bbox"]
+                    summary[f"{variant}_bbox_area_fraction"] = variant_summary[
+                        "bbox_area_fraction"
+                    ]
+                    summary[f"{variant}_top_indices"] = variant_summary["top_indices"]
+                    summary[f"{variant}_top_values"] = variant_summary["top_values"]
+                    summary[f"selected_{variant}_cosine"] = float(
+                        torch.nn.functional.cosine_similarity(
+                            normalized_map,
+                            variant_normalized_maps[variant],
+                            dim=0,
+                        ).item()
+                    )
                 if saver_previous_map is not None:
                     cosine = torch.nn.functional.cosine_similarity(
                         normalized_map,
@@ -445,8 +475,8 @@ def _vhr_decoding(
                 else:
                     summary["cosine_to_previous"] = None
                 saver_previous_map = normalized_map
-                if len(saver_examples) < 5:
-                    saver_examples.append(summary)
+                summary["step_index"] = cur_len - prompt_length
+                saver_current_summary = summary
 
         if synced_gpus and this_peer_finished:
             continue  # don't waste resources running the code we don't need
@@ -601,6 +631,29 @@ def _vhr_decoding(
         else:  # argmax
             next_tokens = torch.argmax(next_token_scores, dim=-1)
 
+        if use_saver_diagnostic:
+            if saver_current_summary is None:
+                raise RuntimeError("SAVER diagnostic did not capture a map for the current SC step")
+            if next_tokens.numel() != 1:
+                raise ValueError("SAVER engineering diagnostics currently require batch size 1")
+            vhr_candidate = int(next_token_logits.argmax(dim=-1)[0].item())
+            base_candidate = int(next_token_logits_cd.argmax(dim=-1)[0].item())
+            selected_candidate = int(next_tokens[0].item())
+            step_summary = dict(saver_current_summary)
+            step_summary.update(
+                {
+                    "vhr_candidate_id": vhr_candidate,
+                    "base_candidate_id": base_candidate,
+                    "selected_candidate_id": selected_candidate,
+                }
+            )
+            if len(saver_examples) < 512:
+                saver_examples.append(step_summary)
+            if selected_candidate != vhr_candidate:
+                saver_switch_steps += 1
+                if len(saver_switch_examples) < 20:
+                    saver_switch_examples.append(dict(step_summary))
+
         if use_switch_diagnostics:
             selected = next_tokens.unsqueeze(-1)
             branch_disagreement = diagnostic_vhr_argmax != diagnostic_base_argmax
@@ -739,7 +792,12 @@ def _vhr_decoding(
             "mean_map_std": saver_std_sum / max(1, saver_map_steps),
             "changed_from_previous_steps": saver_changed_steps,
             "mean_bbox_area_fraction": saver_bbox_area_sum / max(1, saver_map_steps),
+            "mean_all_head_bbox_area_fraction": saver_all_head_bbox_area_sum
+            / max(1, saver_map_steps),
             "examples": saver_examples,
+            "switch_steps": saver_switch_steps,
+            "switch_rate": saver_switch_steps / max(1, saver_map_steps),
+            "switch_examples": saver_switch_examples,
         }
 
     if return_dict_in_generate:

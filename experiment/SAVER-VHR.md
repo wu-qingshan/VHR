@@ -3,7 +3,7 @@
 > 开始日期：2026-07-17
 > 分支：`research/saver-vhr`
 > 起始检查点：`8258862`（tag: `care-scvhr-dev-negative-20260717`）
-> 状态：完成方法假设与工程可行性设计；尚未实现、创建新划分或运行实验。
+> 状态：工程、局部前向和100图grounding诊断已完成；selected-head空间图未通过grounding gate，SAVER效果实验停止，未创建或运行新dev/validation/test。
 
 ## 1. 为什么停止 logits gate 路线
 
@@ -178,3 +178,40 @@ Active-Look 使用全局/局部冲突触发视觉重看。SAVER 的触发来自 
 - 2026-07-17：初版将全部 `mean+std` 高响应patch共同取包围框，平均覆盖81.68%图像，未形成有效局部区域。该结果判定为区域构造工程失败，不进入效果实验。
 - 2026-07-17：在不查看任何CHAIR效果的前提下，将区域定义修正为“包含全局最大patch的4连通高响应分量+一patch扩张”；阈值仍为`mean+std`，不扫描。需重新验证输出等价性和区域面积。
 - 2026-07-17：第二次同图诊断再次与标准SC逐字段一致；73/73 map finite、归一化误差均值 `1.31e-8`、平均std仍为0.0080、72/72相邻步不完全相同。峰值连通分量在该图为单patch，扩张后固定3×3，平均bbox面积降至1.5625%。区域现在空间连贯且足够局部，但尚未验证raw-image坐标映射、crop processor和完整prefix local forward。
+- 2026-07-17：首次 raw-coordinate/local-forward 工程诊断通过。24x24 的 `[0,18,3,21]` 映射到原始 `640x412` 图像的 `[113,309,165,361]`，得到 `52x52` crop；processor 正常产生 `[1,3,336,336]`，完整4-token生成前缀的full/crop base forward均返回finite的32064维logits，生成和local forward后所有VHR临时层状态均为空。该早期步骤不是SC switch且crop落在背景，不能作为grounding有效性证据，因此后续诊断改为只抽取真实switch步骤。
+- 2026-07-17：第一次 switch-gated 诊断暴露首个prefill步骤没有map：原捕获条件只接受 `q_len=1`，而第一个候选来自完整prompt prefill。运行在写出文件前失败，没有效果数据。修正为clean prefill也使用最后一个prompt query构图，使每个候选步骤都有对应map；需重新验证输出等价性和switch-local forward。
+- 2026-07-17：修正后真实switch-local forward通过。首个switch位于step 11，VHR/base候选均为`,`，SC候选为`of`；原图和local crop的base logits都更支持VHR候选，selected-minus-VHR分别为`-0.625/-0.953`。该例同时显示switch可能只是语法路径变化，并非实体token。
+- 2026-07-17：增加all-head控制、去RoPE的content map和attention×value-norm contribution map；保持默认关闭。单图中value map可落到bird实例，但单图不作为结论。
+- 2026-07-17：在CARE dev 100图上进行纯grounding诊断，不计算CHAIR、不使用CARE validation/test。6个GPU分片共100行、100个唯一ID、8779个map步骤、504个SC switch；结果目录保持未跟踪。同进程1图标准SC与诊断SC的ID/text/confidence完全一致。
+
+## 12. Grounding gate结果与停止判定
+
+使用COCO instance segmentation mask，只评估诊断map是否具备空间定位能力，不评估幻觉效果。对每个生成步骤比较四种固定构图：
+
+- `selected`：VHR selected heads的RoPE后QK map；
+- `all_head`：同层全部heads平均；
+- `content`：去除RoPE位置项的content QK map；
+- `value`：selected QK attention乘图像value norm后重新归一化。
+
+共得到130个“生成token正好对应图中真实COCO类别”的候选事件。结果如下：
+
+| map | 任意实例pointing | 真实候选pointing | 真实候选crop命中 |
+|---|---:|---:|---:|
+| selected | 20.29% | 10.00% | 18.46% |
+| all-head | 20.77% | 10.00% | 18.46% |
+| content | 20.41% | 6.92% | 16.15% |
+| value | 16.22% | **16.15%** | 16.15% |
+| raw-image center control | - | **33.85%** | - |
+
+配对检验：
+
+- selected vs center：selected-only/center-only=`2/33`，McNemar exact `p=3.67e-8`；
+- value vs center：value-only/center-only=`6/29`，`p=1.17e-4`；
+- selected与all-head的真实候选命中逐事件完全一致；
+- value vs selected为`16/8`，`p=0.152`，没有显著优势。
+
+此外，504次switch中只有6次（1.19%）SC候选本身是COCO对象类别（boat/clock/person/train/sink）；绝大多数是冠词、介词、形容词、动词或subword。说明SC的收益大量来自先改变语法/轨迹、再间接改变后续实体，而不是直接切换对象token。
+
+**停止判定：当前SAVER假设失败。** selected-head视觉敏感性不能转化为可靠空间grounding，且“只在SC switch时复核实体”与真实switch类型不匹配。根据第9节预设风险规则，不创建SAVER效果划分，不运行CHAIR/POPE效果实验，也不扫描crop大小、层权重、top-k或连续阈值。
+
+该负结果支持新的机制结论：VHR-selected heads主要提供全局视觉条件通路，而不是可直接作为检测器使用的候选实体定位图。下一方法应利用它们在隐藏空间中的全局视觉残差，校正与其冲突的语言先验通路，而不再把attention peak包装为空间解释。

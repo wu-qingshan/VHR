@@ -117,3 +117,9 @@ SAVER selected-head image-token map 工程诊断检查点为 `saver-map-diagnost
 ```bash
 git switch -c restore/saver-map-diagnostic saver-map-diagnostic-20260717
 ```
+
+SAVER raw-coordinate、local forward、map变体与100图grounding否决检查点为 `saver-grounding-negative-20260717`。该标签保留失败机制的完整源码与记录，但不包含任何效果实验；所有 `saver_*_results/` 继续保持未跟踪。该阶段确认selected/all-head/content/value map均未超过中心定位先验，因此禁止从该标签继续扫描空间阈值或crop参数。
+
+```bash
+git switch -c restore/saver-grounding-negative saver-grounding-negative-20260717
+```
