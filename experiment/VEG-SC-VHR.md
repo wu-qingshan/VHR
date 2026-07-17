@@ -3,7 +3,7 @@
 > 开始日期：2026-07-17  
 > 分支：`research/veg-scvhr`  
 > 起始检查点：`c480ed8`（tag: `scvhr-switch-diagnostic-complete-20260717`）  
-> 状态：工程可行性、公式和门槛已预注册，尚未实现或生成 VEG 输出。
+> 状态：dev 已完成。VEG 恢复覆盖并取得中间 Pareto 点，但 CHAIRs 未过预注册门槛且改善不显著；validation 未运行，不扫描视觉 margin，方法不作为主方案。
 
 ## 1. 动机
 
@@ -98,3 +98,57 @@ VEG 必须全部满足：
 - 2026-07-17：完成上述参数免费视觉支持 gate、数据、门槛和停止规则预注册；此时尚未实现 VEG。
 - 2026-07-17：实现独立 `vhr_visual_evidence_gate`、三分支 cache 延续、视觉支持 gate 统计和 `scripts/run_llava15_vegscvhr.py`。标准 SC/DG/PD 默认不保留 text-only 解码 cache。
 - 2026-07-17：64-token 烟雾测试通过，2 次 switch 提议中允许/阻止各 1；完整 512-token 流程在 77 步正常 EOS，4 次提议中允许 3、阻止 1。三分支 cache 无形状冲突，计数守恒，允许进入 dev。
+- 2026-07-17：VEG dev 100 图完整运行，耗时 1055 秒；100 行、ID 顺序、空文本和三分支计数全部通过完整性检查。
+
+## 8. Dev 结果
+
+| 方法 | CHAIRs ↓ | CHAIRi ↓ | Len | generated mentions | unique correct | hallucinated mentions |
+|---|---:|---:|---:|---:|---:|---:|
+| VHR | 39.0 | 11.45 | 80.08 | 681 | 224 | 78 |
+| 标准 SC-VHR | **28.0** | **8.86** | 76.33 | 587 | 221 | **52** |
+| VEG-SC-VHR | 33.0 | 9.53 | 79.85 | 640 | 220 | 61 |
+
+VEG 路由：
+
+- total steps：10383；标准 SC switch 提议 582（5.61%）；
+- 允许 298、阻止 284，允许比例 51.20%；
+- 99/100 图至少有一次 switch 提议；每图允许比例中位数 50%。
+
+运行成本：VEG 1055 秒，标准 SC 同集 868 秒，VEG 慢 **21.5%**；相对 VHR 458 秒为 2.30×。
+
+逐图配对：
+
+- VEG vs VHR：CHAIRs -5.98，95% CI `[-14,2]`；CHAIRi -1.91，95% CI `[-4.53,0.64]`；修复 11、新增 5。
+- VEG vs 标准 SC：CHAIRs +5.02，95% CI `[-1,11]`；标准 SC→VEG 修复 2、新增 7。
+- unique correct 保留 98.21%，total mentions 保留 93.98%，Len -0.29%；覆盖门槛均通过。
+
+## 9. 预注册 gate 判定
+
+| 门槛 | VEG 结果 | 判定 |
+|---|---:|---|
+| CHAIRs ≤31 | 33.0 | **失败** |
+| CHAIRi ≤9.8 | 9.53 | 通过 |
+| total mentions ≥90% | 93.98% | 通过 |
+| unique correct ≥98% | 98.21% | 通过 |
+| Len ±7% | -0.29% | 通过 |
+| repeated rate 最大 +3pp | -0.48pp | 通过 |
+| 允许且阻止 switch | 298 / 284 | 通过 |
+| 完整性与三分支同步 | 通过 | 通过 |
+
+总判定：**失败**。VEG 是 VHR 与标准 SC 之间的可解释 Pareto 点，但核心 CHAIRs 未达预注册门槛，且 100 图 paired CI 跨 0；不能进入锁定 validation，也不能声称可靠优于 VHR。
+
+## 10. 视觉证据信号分析
+
+按 VHR→VEG CHAIRs 转移：保持正确/新增/修复/持续幻觉为 56/5/11/28。
+
+- 修复图的 proposed switch rate 比持续幻觉高 1.76pp，95% CI `[0.15pp,3.57pp]`；
+- 修复图 allowed support margin 均值 1.43，持续幻觉 0.77，差值 CI `[0.16,1.29]`；视觉支持含有正确信号；
+- 但新增幻觉与保持正确在 proposed/allowed rate、allow fraction、allowed margin 上均无可靠分离；
+- 因此零阈值视觉 gate 能恢复覆盖，却不能充分阻止错误 switch。事后调高 margin 属于参数扫描，按规则不进行。
+
+## 11. 决策
+
+- VEG 保留为“独立视觉证据有信号但单一相对 gate 不足”的负/部分正消融；
+- 不运行 `experiment/pdscvhr_validation_chair_ids.json`；
+- 不扫描 margin、温度或加权函数；
+- 标准 SC 仍是开放描述主方法。下一优化转向 response-type routing：开放描述使用 SC，二元存在性问题完整回退原 VHR，以解决已知 POPE recall/F1 回归并降低二元任务时延。

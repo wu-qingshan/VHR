@@ -22,6 +22,8 @@ Disagreement-Gated SC-VHR 只在 VHR/base argmax 不一致时使用 contrast。�
 
 随后对标准 SC 进行 100 图逐 token 诊断重跑，并与历史输出 100/100 逐字等价。9955 步中 branch argmax 分歧占 11.40%，但标准 SC 实际 switch 只有 5.87%；584 次 switch 中 508 次（86.99%）发生在两分支 argmax 原本相同的步骤。修复与持续幻觉在 switch rate、selected delta、score margin 上没有可用于可靠阈值的显著分离。因此停止两分支标量 gate 扫描，下一候选转向引入在线 text-only 视觉证据的 VEG-SC-VHR。
 
+VEG-SC-VHR 保留在线 text-only 第三分支，并只允许视觉支持不低于 VHR top 的标准 SC switch。新 dev 结果为 33.0/9.53/79.85，mentions 保留 93.98%、unique correct 保留 98.21%，处于 VHR 39.0/11.45 与标准 SC 28.0/8.86 之间；但 CHAIRs 未达到预注册 ≤31，paired CI `[-14,2]` 跨 0，且比标准 SC 慢 21.5%。视觉 support margin 对修复有信号，却不能区分新增幻觉，因此不扫描 margin、不运行 validation。下一方向转为 response-type routing 解决 POPE 回归。
+
 ## 已放弃的第一候选：DC-VHR
 
 暂定名称：Direction-Calibrated VHR（DC-VHR）。

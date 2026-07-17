@@ -71,3 +71,5 @@ DG dev 负结果与机制结论的检查点标签为 `dgscvhr-dev-negative-20260
 100 图逐字等价诊断与 VEG 下一方向结论的检查点标签为 `scvhr-switch-diagnostic-complete-20260717`。
 
 VEG 三分支预注册实现与完整 EOS 烟雾测试的检查点标签为 `vegscvhr-preregistered-20260717`。
+
+VEG dev 部分正/门槛失败结果的检查点标签为 `vegscvhr-dev-negative-20260717`。锁定 validation 未运行。
