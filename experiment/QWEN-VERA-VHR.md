@@ -170,6 +170,9 @@ AMBER/MMHal/HallusionBench、POPE、MME/MMBench和近期强基线。
   接受3/10：base 2、VHR 1，其余7个逐字fallback；base-only接受2，VHR-only接受1。
   接受和fallback路径、protected-root、trigger-root、length、cycle和score审计均物化。
   新VERA dev/validation/test仍未运行。
+- 2026-07-17：新增冻结dev分析器，固定计算CHAIR、unique coverage、object增删、cycle、
+  source max-hit、总pipeline时延、候选routing、grammar和paired bootstrap，并逐项执行
+  第5节门槛。分析器提交前没有运行新dev CHAIR；随后才启动六GPU baseline生成。
 
 工程结果SHA256：
 

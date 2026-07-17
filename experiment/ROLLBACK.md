@@ -176,3 +176,7 @@ VERA核心策略、任务/双候选/二次query/严格物化脚本、vanilla cac
 顺序/重复等价性和10-task接受/fallback完整链路通过后的标签为
 `qwen-vera-engineering-ready-20260717`。所有smoke结果保持untracked；新VERA dev与两个
 locked集合尚未运行。
+
+VERA固定dev分析器与baseline/source-query/revision/candidate-query/materialization完整
+执行接口冻结后的标签为`qwen-vera-dev-runner-ready-20260717`。该标签固定所有效果、
+coverage、CI、效率和接受率门槛；不含完整dev结果。
