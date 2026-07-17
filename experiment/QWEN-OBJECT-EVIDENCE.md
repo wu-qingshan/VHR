@@ -109,3 +109,40 @@ OER 输出目录运行 dev；locked validation 仍保持未查看。
 
 工程 tag：`qwen-object-verifier-engineering-ready-20260717`。下一步只运行预注册的
 617-query feasibility，不生成或修改 caption。
+
+## 8. 617-query feasibility 结果
+
+六个 GPU chunk 全部 exit 0，严格合并 617/617 query。结果目录保持 untracked：
+
+- queries SHA256：`c8c6c59e67135e4308226d7b1ca2dcf7241c5ac5718b8062b9139b627af8e036`；
+- verifier SHA256：`ded1cf9e1c1a308c8675320d6e05a6473b83e6c75a2145b6b5a47f64c37488f8`；
+- analysis SHA256：`c0a941d812b4eef6770e8f090a64ca26684d17faf81e8d99e830f2d6d62779c5`。
+
+| 指标 | 结果 |
+|---|---:|
+| queries（正/负） | 617（531/86） |
+| ROC-AUC | **0.9260** |
+| PR-AUC | **0.9874** |
+| Accuracy | 0.8817 |
+| Balanced accuracy | **0.7948** |
+| Precision / Recall / F1 | 0.9455 / 0.9153 / 0.9301 |
+| TN / FP / FN / TP | 58 / 28 / 45 / 486 |
+| positive score mean/median | 0.8935 / 0.9933 |
+| negative score mean/median | 0.3063 / 0.1261 |
+| mean gap | 0.5872 |
+| mean gap 95% CI | **[0.5128,0.6581]** |
+| 秒/query | 0.2471 |
+
+五项预注册 gate 全部通过，结论为 **verifier feasible，允许实现 OER**。
+
+但 threshold=0.5 仍有45个真实对象 false negative 和28个幻觉 false positive，不能把
+“score<0.5”机械等同于删除整个句子。错误集中于小物体/局部物体（traffic light、
+laptop、tie）以及词义歧义（如 orange 可表示颜色或物体）。因此 OER 必须：
+
+1. 使用通用 noun phrase 的完整短语和上下文，而不是仅 canonical 单词；
+2. 将 verifier 作为证据而非唯一标签，避免低分直接删除含多个真实对象的整句；
+3. 优先做最小 phrase/clause 修订，并重新验证修订后新对象；
+4. 单独报告 false verification、对象 recall、句子删除率和额外计算。
+
+本阶段固定 tag：`qwen-object-verifier-feasible-20260717`。下一阶段需另行预注册 OER
+候选提取、证据使用和修订规则，不能根据 locked validation 选择 threshold。

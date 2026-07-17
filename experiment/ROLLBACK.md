@@ -146,3 +146,7 @@ Qwen 对象 Yes/No logit verifier 的固定 prompt、token ids、全300图 query
 617-query 构造、dog/elephant/giraffe 方向、重复确定性和动态 image-grid 状态清理通过
 后的标签为 `qwen-object-verifier-engineering-ready-20260717`。query/smoke 结果保持
 在未跟踪 `qwen_object_evidence_results/`。
+
+617-query ROC-AUC/PR-AUC/balanced-accuracy/bootstrap 分析和 verifier feasibility
+通过后的标签为 `qwen-object-verifier-feasible-20260717`。该标签允许进入 OER 修订
+设计，但不包含任何 caption 修订或 locked validation 结果。

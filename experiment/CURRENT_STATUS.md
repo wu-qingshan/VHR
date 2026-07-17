@@ -42,6 +42,11 @@ vanilla 出发，再做对象级视觉证据验证，不能默认沿VHR/SC生成
 AUC、balanced accuracy 和 score-gap 门槛，才实现通用 noun-phrase 提取与最小 caption
 修订；协议见 `experiment/QWEN-OBJECT-EVIDENCE.md`。
 
+对象 verifier feasibility 已通过：617 queries（531真实/86幻觉），ROC-AUC 0.926、
+balanced accuracy 0.795，正负 mean score gap 0.587、95% CI `[0.513,0.658]`。这成为
+目前现代 Qwen 上最可靠的机制信号。下一步实现通用 noun-phrase + 最小证据修订，但
+不能用0.5阈值机械删除整句，因为仍有45个真实对象被判No。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：
