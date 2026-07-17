@@ -129,3 +129,8 @@ Qwen 300 图 dev 的完整负结果、coverage/cycle/runtime/bootstrap 分析和
 SRR-SC-VHR 的固定 exact-cycle 风险定义、不可逆 base rollback、停止 VHR forward
 规则和严格 dev gate 的预注册标签为 `qwen-srr-preregistered-20260717`。该标签不含
 SRR 实现或结果。
+
+SRR CPU cycle/safe-token 单元测试、无风险 SRR=SC、真实 cycle rollback、停止 VHR
+forward、base cache 连续与重复运行等价性全部通过后的标签为
+`qwen-srr-engineering-ready-20260717`。工程结果保持在未跟踪
+`qwen_srr_smoke_results/`。

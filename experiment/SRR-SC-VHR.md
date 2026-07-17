@@ -3,7 +3,7 @@
 > 日期：2026-07-17
 > 分支：`research/qwen-stability-router`
 > 起点：`qwen-scvhr-dev-negative-20260717`
-> 当前状态：方法与门槛预注册；尚未实现、尚未生成 SRR 输出
+> 当前状态：实现与工程门槛通过；尚未运行 300 图 SRR dev
 
 ## 1. 动机
 
@@ -88,3 +88,15 @@ tag，才允许在未查看的 Qwen locked validation 500 图运行一次。
 
 - 2026-07-17：从 Qwen SC dev negative tag 建立独立分支，冻结算法、工程门槛和
   dev/validation 停止规则；未运行 SRR。
+- 2026-07-17：实现 `srrscvhr` 独立 mode。CPU 单元测试确认 period≤16、连续3次的
+  cycle 在完成前被识别；base argmax 仍危险时会逐个屏蔽并选择最高安全 token。
+- 2026-07-17：无 exact-cycle 风险的 dev 图 497826 上，SRR 不触发且完整等于 SC，
+  说明规则不是无条件后处理。
+- 2026-07-17：正式 SC cycle 图 220215 上 GPU 工程检查全部通过：前8 token SRR=SC；
+  step 143 检测到 period 1、block `name` 的风险并永久 rollback；VHR/base forward
+  为 144/185，触发后 VHR 不再增加；屏蔽 1 个仍会成 cycle 的 base 候选；最终无
+  exact cycle；同图重复运行逐 token 一致。结果目录 `qwen_srr_smoke_results/`
+  保持 untracked。
+
+工程固定 tag：`qwen-srr-engineering-ready-20260717`。下一步只生成 SRR 300 图，
+所有 vanilla/VHR/SC baseline 均复用封存结果。

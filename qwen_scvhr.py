@@ -16,7 +16,7 @@ from transformers.generation.logits_process import RepetitionPenaltyLogitsProces
 from qwen_vhr import qwen_vhr_state_report, reset_qwen_vhr_state, set_qwen_vhr_phase
 
 
-SUPPORTED_MODES = {"vanilla", "vhr", "scvhr"}
+SUPPORTED_MODES = {"vanilla", "vhr", "scvhr", "srrscvhr"}
 
 
 def is_binary_question(question):
@@ -54,6 +54,7 @@ class QwenDecodeResult:
     terminated: bool
     forward_counts: Dict[str, int]
     vhr_state: list
+    routing_stats: Dict[str, object]
 
     def to_dict(self):
         return asdict(self)
@@ -185,6 +186,47 @@ def _repetition_processor(model):
     return None if penalty == 1.0 else RepetitionPenaltyLogitsProcessor(penalty)
 
 
+def cycle_if_appended(processor, generated_ids, candidate_id, max_period=16, repeats=3):
+    """Return the exact whitespace cycle completed by one candidate, if any."""
+
+    text = processor.decode(
+        list(generated_ids) + [int(candidate_id)],
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    )
+    tokens = text.split()
+    max_candidate_period = min(max_period, len(tokens) // repeats)
+    for period in range(1, max_candidate_period + 1):
+        block = tokens[-period:]
+        if all(
+            tokens[-(repeat_index + 1) * period : -repeat_index * period] == block
+            for repeat_index in range(1, repeats)
+        ):
+            return {"period": period, "block": block, "text_token_count": len(tokens)}
+    return None
+
+
+def highest_safe_token(scores, processor, generated_ids, max_period=16, repeats=3):
+    """Choose the highest-scoring token that does not complete an exact cycle."""
+
+    safe_scores = scores.clone()
+    masked = 0
+    while masked < safe_scores.shape[-1]:
+        token = safe_scores.argmax(dim=-1, keepdim=True)
+        cycle = cycle_if_appended(
+            processor,
+            generated_ids,
+            int(token.item()),
+            max_period=max_period,
+            repeats=repeats,
+        )
+        if cycle is None:
+            return token, masked
+        safe_scores.scatter_(-1, token, -float("inf"))
+        masked += 1
+    raise RuntimeError("all vocabulary tokens were rejected by the exact-cycle safety mask")
+
+
 @torch.inference_mode()
 def generate_qwen(
     model,
@@ -219,7 +261,7 @@ def generate_qwen(
     terminated = False
 
     try:
-        if mode in {"vhr", "scvhr"}:
+        if mode in {"vhr", "scvhr", "srrscvhr"}:
             _text_calibration(model, inputs)
             forward_counts["text"] += 1
             logits_vhr, cache_vhr, rope_vhr = _prefill_branch(model, inputs, "clean")
@@ -231,7 +273,7 @@ def generate_qwen(
         cache_base = None
         rope_base = None
         logits_base = None
-        if mode == "scvhr":
+        if mode in {"scvhr", "srrscvhr"}:
             logits_base, cache_base, rope_base = _prefill_branch(model, inputs, "vanilla")
             forward_counts["base"] += 1
 
@@ -239,17 +281,40 @@ def generate_qwen(
         input_history = inputs["input_ids"].clone()
         eos_ids = _eos_ids(model)
         repetition_processor = _repetition_processor(model)
+        rollback_active = False
+        rollback_step = None
+        rollback_cycle = None
+        safe_masked_tokens = 0
 
         for step in range(max_new_tokens):
-            if mode == "scvhr":
+            if mode in {"scvhr", "srrscvhr"} and not rollback_active:
                 cutoff = math.log(beta) + logits_vhr.max(dim=-1, keepdim=True).values
                 scores = (1 + alpha) * logits_vhr - alpha * logits_base
                 scores = scores.masked_fill(logits_vhr < cutoff, -float("inf"))
+            elif mode == "srrscvhr" and rollback_active:
+                scores = logits_base
             else:
                 scores = logits_vhr
             if repetition_processor is not None:
                 scores = repetition_processor(input_history, scores)
+
             token = scores.argmax(dim=-1, keepdim=True)
+            if mode == "srrscvhr":
+                if not rollback_active:
+                    risk = cycle_if_appended(processor, generated, int(token.item()))
+                    if risk is not None:
+                        rollback_active = True
+                        rollback_step = step
+                        rollback_cycle = risk
+                        base_scores = logits_base
+                        if repetition_processor is not None:
+                            base_scores = repetition_processor(input_history, base_scores)
+                        token, masked = highest_safe_token(base_scores, processor, generated)
+                        scores = base_scores
+                        safe_masked_tokens += masked
+                else:
+                    token, masked = highest_safe_token(scores, processor, generated)
+                    safe_masked_tokens += masked
             if first_confidence is None:
                 first_confidence = float(scores.softmax(dim=-1).gather(-1, token).item())
             token_id = int(token.item())
@@ -265,17 +330,19 @@ def generate_qwen(
                 [attention_mask, torch.ones_like(token, dtype=attention_mask.dtype)],
                 dim=1,
             )
-            phase = "decode" if mode in {"vhr", "scvhr"} else "vanilla"
-            logits_vhr, cache_vhr = _decode_branch(
-                model,
-                token,
-                attention_mask,
-                cache_vhr,
-                rope_vhr,
-                phase,
-            )
-            forward_counts["vhr" if phase == "decode" else "base"] += 1
-            if mode == "scvhr":
+            update_vhr = mode in {"vhr", "scvhr"} or (mode == "srrscvhr" and not rollback_active)
+            if update_vhr:
+                phase = "decode" if mode in {"vhr", "scvhr", "srrscvhr"} else "vanilla"
+                logits_vhr, cache_vhr = _decode_branch(
+                    model,
+                    token,
+                    attention_mask,
+                    cache_vhr,
+                    rope_vhr,
+                    phase,
+                )
+                forward_counts["vhr" if phase == "decode" else "base"] += 1
+            if mode in {"scvhr", "srrscvhr"}:
                 logits_base, cache_base = _decode_branch(
                     model,
                     token,
@@ -306,6 +373,12 @@ def generate_qwen(
             terminated=terminated,
             forward_counts=forward_counts,
             vhr_state=state,
+            routing_stats={
+                "rollback_triggered": rollback_active,
+                "rollback_step": rollback_step,
+                "rollback_cycle": rollback_cycle,
+                "safe_masked_tokens": safe_masked_tokens,
+            },
         )
     finally:
         reset_qwen_vhr_state(model)

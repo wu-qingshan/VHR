@@ -15,7 +15,7 @@ from qwen_vhr import install_qwen_vhr, uninstall_qwen_vhr
 
 
 PROMPT = "Please describe this image in detail."
-VALID_METHODS = ("vanilla", "vhr", "scvhr")
+VALID_METHODS = ("vanilla", "vhr", "scvhr", "srrscvhr")
 
 
 def parse_args():
@@ -129,6 +129,7 @@ def main():
                     "elapsed_seconds": result.elapsed_seconds,
                     "peak_allocated_gib": result.peak_allocated_gib,
                     "forward_counts": result.forward_counts,
+                    "routing_stats": result.routing_stats,
                 }
                 handles[method].write(json.dumps(row, ensure_ascii=False) + "\n")
                 handles[method].flush()
