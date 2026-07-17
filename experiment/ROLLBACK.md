@@ -63,3 +63,5 @@ PD 新 dev 负结果完成后的检查点使用标签 `pdscvhr-dev-negative-2026
 三套 LLaVA pooled 分析与通用多配对脚本的检查点标签为 `scvhr-llava-pooled-20260717`。
 
 DG-SC-VHR 预注册实现与成功烟雾测试的检查点标签为 `dgscvhr-preregistered-20260717`；生成结果保持未跟踪。
+
+DG dev 负结果与机制结论的检查点标签为 `dgscvhr-dev-negative-20260717`。锁定 validation 未运行。

@@ -18,6 +18,8 @@ CHAIRs/CHAIRi 两套均显著改善且长度稳定，但 total generated mention
 
 三套互斥 LLaVA 划分 pooled 共 300 图：CHAIRs 38.67→**28.00**（95% CI `[-15.00,-6.33]`），CHAIRi 12.66→**9.25**，修复/新增 39/7，McNemar `p=1.83e-6`。hallucinated mentions 下降 34.72%，repeated mentions 下降 11.35%；unique correct objects 716→693（保留 96.79%），下降约 3.2% 且 pooled CI 不跨 0。论文中应报告为“显著 hallucination reduction + 小幅但真实的语义覆盖代价”，而不是完全无损。
 
+Disagreement-Gated SC-VHR 只在 VHR/base argmax 不一致时使用 contrast。新 dev 上实际仅 11.46% token 步触发；unique correct 224→224、mentions 保留 97.8%，但 CHAIRs 39→38（CI `[-5,3]`），远差于标准 SC 的 28。它只显著改善 CHAIRi 到 10.06，因此否决且不运行 validation。结论是标准 SC 的关键收益大量来自“两分支 argmax 相同、外推后第三 token 上升”的步骤，简单二元路由不足。
+
 ## 已放弃的第一候选：DC-VHR
 
 暂定名称：Direction-Calibrated VHR（DC-VHR）。

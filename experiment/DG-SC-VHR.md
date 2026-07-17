@@ -3,7 +3,7 @@
 > 开始日期：2026-07-17  
 > 分支：`research/dg-scvhr`  
 > 起始检查点：`106c134`（tag: `scvhr-llava-pooled-20260717`）  
-> 状态：方法与门槛已预注册，尚未实现或生成 DG 输出。
+> 状态：dev 已完成。DG 完全保留 unique correct coverage 并显著降低词级幻觉，但 CHAIRs 仅改善 1 点、未通过预注册门槛；validation 未运行，方法否决。
 
 ## 1. 问题与已有证据
 
@@ -73,3 +73,44 @@ DG 必须同时满足：
 - 2026-07-17：建立 `research/dg-scvhr` 分支并完成上述方法、数据、gate 和停止规则预注册；此时尚未实现或运行 DG。
 - 2026-07-17：以独立 `vhr_disagreement_gate` generation flag 实现路由；新增逐图 `routing_stats` 和单次加载 runner `scripts/run_llava15_dgscvhr.py`。标准 SC、PD、VCD 路径不启用该 flag。
 - 2026-07-17：张量路由测试通过；新 dev 第一图 64-token 烟雾测试成功，10/64 步触发 contrast（15.625%），结果 JSON 的路由计数完整。烟雾输出不参与指标。
+- 2026-07-17：DG dev 100 图完整运行，耗时 920 秒。文件为 100 行、ID 与固定顺序完全一致、无空回答，所有路由计数合法。
+
+## 7. Dev 结果
+
+| 方法 | CHAIRs ↓ | CHAIRi ↓ | Len | generated mentions | hallucinated mentions |
+|---|---:|---:|---:|---:|---:|
+| VHR | 39.0 | 11.45 | 80.08 | 681 | 78 |
+| 标准 SC-VHR | **28.0** | **8.86** | 76.33 | 587 | **52** |
+| DG-SC-VHR | 38.0 | 10.06 | 80.52 | 666 | 67 |
+
+路由统计：
+
+- pooled contrast steps：1199/10459，**11.46%**；
+- 每图 contrast rate 均值 11.46%，中位数 11.11%；
+- p10/p90：6.86% / 16.28%；范围 2.90%–20.00%。
+
+逐图配对 bootstrap（20,000 次）：
+
+- DG vs VHR：CHAIRs 差值 -0.98，95% CI `[-5,3]`；CHAIRi 差值 -1.39，95% CI `[-2.83,-0.16]`；修复 3、新增 2。
+- DG vs 标准 SC：CHAIRs 差值 +10.02，95% CI `[3,18]`；DG 显著退化。
+
+## 8. 预注册 gate 判定
+
+| 门槛 | DG 结果 | 判定 |
+|---|---:|---|
+| CHAIRs ≤32 | 38.0 | **失败** |
+| CHAIRi ≤10.5 | 10.06 | 通过 |
+| total mentions ≥90% VHR | 97.80% | 通过 |
+| unique correct ≥97% VHR | **100.00%** | 通过 |
+| Len 在 VHR ±7% | +0.55% | 通过 |
+| repeated rate 最大 +3pp | -0.34pp | 通过 |
+| 完整性与路由统计 | 完整 | 通过 |
+
+总判定：**失败**。DG 取得词级幻觉减少且完全保留唯一正确对象，但句级 CHAIRs 没有可靠改善，不能作为标准 SC 的替代。锁定 validation 不运行，且不扫描路由阈值或 top-k。
+
+## 9. 机制结论
+
+1. VHR/base 原始 argmax 分歧只占约 11.5% 生成步骤；只在这些步骤应用 contrast 不足以复现标准 SC 的句级收益。
+2. 标准 SC 的关键行为应大量发生在：VHR 与 base argmax 相同，但双边外推后另一个 token 成为 argmax。即有效信号不仅是分支决策分歧，也包括完整 logit 几何中的相对斜率。
+3. DG 将 unique correct objects 从 224 保持到 224，证明无分歧步骤确实贡献了覆盖扰动；但同时也贡献了绝大多数 hallucination reduction。
+4. 下一步不应继续做二元“开/关 contrast”路由。更有价值的是对标准 SC 引发的 token switch 做诊断，区分同-argmax switch 中哪些对应幻觉修复，随后设计带置信边界的 suppression cap。
