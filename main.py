@@ -157,6 +157,9 @@ class HallucinationTest:
                     }
                 )
             if "scvhr" in self.method:
+                use_counterfactual_alignment = (
+                    "cascvhr" in self.method or "carescvhr" in self.method
+                )
                 generate_kwargs.update(
                     {
                         "vhr_base_contrast": True,
@@ -164,6 +167,8 @@ class HallucinationTest:
                         "vhr_disagreement_gate": "dgscvhr" in self.method,
                         "vhr_switch_diagnostics": "scvhrdiag" in self.method,
                         "vhr_visual_evidence_gate": "vegscvhr" in self.method,
+                        "vhr_counterfactual_alignment": use_counterfactual_alignment,
+                        "vhr_stability_guard": "carescvhr" in self.method,
                         "vhr_logit_alpha": self.vhr_logit_alpha,
                         "vhr_logit_beta": self.vhr_logit_beta,
                     }
@@ -205,6 +210,13 @@ class HallucinationTest:
             if "rrscvhr" in self.method:
                 response_route = "vhr" if is_binary_question(qu) else "scvhr"
                 generate_kwargs["vhr_base_contrast"] = response_route == "scvhr"
+            elif "cascvhr" in self.method or "carescvhr" in self.method:
+                aligned_route = "care-scvhr" if "carescvhr" in self.method else "ca-scvhr"
+                response_route = "vhr" if is_binary_question(qu) else aligned_route
+                use_care = response_route != "vhr"
+                generate_kwargs["vhr_base_contrast"] = use_care
+                generate_kwargs["vhr_counterfactual_alignment"] = use_care
+                generate_kwargs["vhr_stability_guard"] = use_care and "carescvhr" in self.method
             prompt = self.template.format(question=qu)
             inputs = self.processor(text=prompt, images=img, return_tensors="pt")
             inputs = {key: value.to(self.device) for key, value in inputs.items()}
@@ -324,6 +336,15 @@ class HallucinationTest:
                 result_row["visual_evidence_stats"] = dict(
                     self.model._last_vhr_visual_evidence_stats
                 )
+            if "cascvhr" in self.method or "carescvhr" in self.method:
+                if response_route != "vhr":
+                    result_row["counterfactual_alignment_stats"] = dict(
+                        self.model._last_vhr_counterfactual_alignment_stats
+                    )
+                if "carescvhr" in self.method and response_route != "vhr":
+                    result_row["stability_stats"] = dict(
+                        self.model._last_vhr_stability_stats
+                    )
             if response_route is not None:
                 result_row["response_route"] = response_route
             output_file.write(json.dumps(result_row) + "\n")

@@ -53,6 +53,76 @@ def apply_visual_evidence_gate(primary_logits, base_logits, text_logits, contras
     return routed_logits, proposed_switch, allowed_switch, support_margin
 
 
+def compute_counterfactual_aligned_logits(
+    intervention_logits,
+    base_logits,
+    text_logits,
+    alpha,
+):
+    """Keep intervention deltas only when their sign agrees with independent visual evidence."""
+    intervention_delta = intervention_logits - base_logits
+    visual_delta = base_logits - text_logits
+    aligned = intervention_delta * visual_delta > 0
+    aligned_delta = torch.where(aligned, intervention_delta, torch.zeros_like(intervention_delta))
+    return (
+        intervention_logits + alpha * aligned_delta,
+        aligned,
+        intervention_delta,
+        visual_delta,
+    )
+
+
+def candidate_completes_exact_cycle(history, candidate, max_period=16, repeats=3):
+    """Return a per-batch mask for a candidate that completes an exact consecutive token cycle."""
+    if history.ndim != 2 or candidate.ndim != 1:
+        raise ValueError("history must be [batch, length] and candidate must be [batch]")
+    sequence = torch.cat([history, candidate[:, None]], dim=-1)
+    result = torch.zeros(sequence.shape[0], dtype=torch.bool, device=sequence.device)
+    for batch_index in range(sequence.shape[0]):
+        tokens = sequence[batch_index]
+        max_candidate_period = min(max_period, tokens.numel() // repeats)
+        for period in range(1, max_candidate_period + 1):
+            block = tokens[-period:]
+            if all(
+                torch.equal(
+                    tokens[-(repeat_index + 1) * period:-repeat_index * period],
+                    block,
+                )
+                for repeat_index in range(1, repeats)
+            ):
+                result[batch_index] = True
+                break
+    return result
+
+
+def apply_intervention_stability_guard(
+    intervention_logits,
+    candidate_logits,
+    generated_ids,
+    max_period=16,
+    repeats=3,
+):
+    """Fall back only when the intervention contrast uniquely introduces an exact cycle."""
+    intervention_top = intervention_logits.argmax(dim=-1)
+    candidate_top = candidate_logits.argmax(dim=-1)
+    different = intervention_top != candidate_top
+    candidate_cycle = candidate_completes_exact_cycle(
+        generated_ids,
+        candidate_top,
+        max_period=max_period,
+        repeats=repeats,
+    )
+    intervention_cycle = candidate_completes_exact_cycle(
+        generated_ids,
+        intervention_top,
+        max_period=max_period,
+        repeats=repeats,
+    )
+    guarded = different & candidate_cycle & (~intervention_cycle)
+    routed_logits = torch.where(guarded[:, None], intervention_logits, candidate_logits)
+    return routed_logits, guarded, candidate_cycle, intervention_cycle
+
+
 def _vhr_decoding(
     self,
     input_ids: torch.LongTensor,
@@ -119,6 +189,9 @@ def _vhr_decoding(
     use_disagreement_gate = generation_config.vhr_disagreement_gate
     use_switch_diagnostics = generation_config.vhr_switch_diagnostics
     use_visual_evidence_gate = generation_config.vhr_visual_evidence_gate
+    use_counterfactual_alignment = generation_config.vhr_counterfactual_alignment
+    use_stability_guard = generation_config.vhr_stability_guard
+    use_text_contrast = use_visual_evidence_gate or use_counterfactual_alignment
     use_aux_contrast = use_vcd or use_base_contrast
     if use_vcd and use_base_contrast:
         raise ValueError("Choose either noisy-image VCD or VHR self-contrast, not both")
@@ -132,6 +205,16 @@ def _vhr_decoding(
         raise ValueError("Visual-evidence gating requires VHR self-contrast")
     if use_visual_evidence_gate and (use_disagreement_gate or generation_config.vhr_positive_delta_contrast):
         raise ValueError("Visual-evidence gating cannot be combined with DG or positive-delta contrast")
+    if use_counterfactual_alignment and not use_base_contrast:
+        raise ValueError("Counterfactual alignment requires VHR self-contrast")
+    if use_counterfactual_alignment and (
+        use_visual_evidence_gate
+        or use_disagreement_gate
+        or generation_config.vhr_positive_delta_contrast
+    ):
+        raise ValueError("Counterfactual alignment is a separate alternative to VEG, DG, and PD")
+    if use_stability_guard and not use_counterfactual_alignment:
+        raise ValueError("Stability guarding requires counterfactual alignment")
 
     disagreement_total_steps = 0
     disagreement_contrast_steps = 0
@@ -150,6 +233,16 @@ def _vhr_decoding(
     visual_blocked_switch_steps = 0
     visual_allowed_margin_sum = 0.0
     visual_blocked_margin_sum = 0.0
+    alignment_total_plausible_tokens = 0
+    alignment_aligned_plausible_tokens = 0
+    alignment_positive_tokens = 0
+    alignment_negative_tokens = 0
+    alignment_retained_abs_delta = 0.0
+    alignment_total_abs_delta = 0.0
+    stability_total_steps = 0
+    stability_guarded_steps = 0
+    stability_candidate_cycle_steps = 0
+    stability_intervention_cycle_steps = 0
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -230,7 +323,7 @@ def _vhr_decoding(
                 set_vhr_phase(self, "noisy")
                 outputs_nc = self(**model_inputs_nc, return_dict=True)
                 del outputs_nc
-            if not use_visual_evidence_gate:
+            if not use_text_contrast:
                 del outputs_tc
 
             if use_vcd:
@@ -277,7 +370,7 @@ def _vhr_decoding(
             next_token_logits_cd = outputs_cd.logits.clone()[:, -1, :].float()
 
             next_token_logits_tc = None
-            if use_visual_evidence_gate:
+            if use_text_contrast:
                 if cur_len != prompt_length:
                     model_inputs_tc = self.prepare_inputs_for_generation(input_ids_tc, **model_kwargs_tc)
                     model_inputs_tc.update(
@@ -298,14 +391,43 @@ def _vhr_decoding(
             contrast_alpha = generation_config.cd_alpha if use_vcd else generation_config.vhr_logit_alpha
             contrast_beta = generation_config.cd_beta if use_vcd else generation_config.vhr_logit_beta
             cutoff = math.log(contrast_beta) + next_token_logits.max(dim=-1, keepdim=True).values
-            contrasted_logits = compute_contrasted_logits(
-                next_token_logits,
-                next_token_logits_cd,
-                contrast_alpha,
-                positive_delta=(
-                    use_base_contrast and generation_config.vhr_positive_delta_contrast
-                ),
-            )
+            if use_counterfactual_alignment:
+                (
+                    contrasted_logits,
+                    alignment_mask,
+                    intervention_delta,
+                    visual_delta,
+                ) = compute_counterfactual_aligned_logits(
+                    next_token_logits,
+                    next_token_logits_cd,
+                    next_token_logits_tc,
+                    contrast_alpha,
+                )
+                plausible = next_token_logits >= cutoff
+                aligned_plausible = alignment_mask & plausible
+                alignment_total_plausible_tokens += int(plausible.sum().item())
+                alignment_aligned_plausible_tokens += int(aligned_plausible.sum().item())
+                alignment_positive_tokens += int(
+                    (aligned_plausible & (intervention_delta > 0) & (visual_delta > 0)).sum().item()
+                )
+                alignment_negative_tokens += int(
+                    (aligned_plausible & (intervention_delta < 0) & (visual_delta < 0)).sum().item()
+                )
+                alignment_retained_abs_delta += float(
+                    (intervention_delta.abs() * aligned_plausible.float()).sum().item()
+                )
+                alignment_total_abs_delta += float(
+                    (intervention_delta.abs() * plausible.float()).sum().item()
+                )
+            else:
+                contrasted_logits = compute_contrasted_logits(
+                    next_token_logits,
+                    next_token_logits_cd,
+                    contrast_alpha,
+                    positive_delta=(
+                        use_base_contrast and generation_config.vhr_positive_delta_contrast
+                    ),
+                )
             contrasted_logits = contrasted_logits.masked_fill(next_token_logits < cutoff, -float("inf"))
             if use_disagreement_gate:
                 contrasted_logits, disagreement = apply_disagreement_gate(
@@ -335,6 +457,22 @@ def _vhr_decoding(
                 visual_blocked_margin_sum += float(
                     (support_margin * blocked_switch.float()).sum().item()
                 )
+            if use_stability_guard:
+                generated_ids = input_ids[:, prompt_length:]
+                (
+                    contrasted_logits,
+                    guarded,
+                    candidate_cycle,
+                    intervention_cycle,
+                ) = apply_intervention_stability_guard(
+                    next_token_logits,
+                    contrasted_logits,
+                    generated_ids,
+                )
+                stability_total_steps += guarded.numel()
+                stability_guarded_steps += int(guarded.sum().item())
+                stability_candidate_cycle_steps += int(candidate_cycle.sum().item())
+                stability_intervention_cycle_steps += int(intervention_cycle.sum().item())
             next_token_scores = logits_processor(input_ids, contrasted_logits)
         else:
             next_token_scores = logits_processor(input_ids, next_token_logits)
@@ -410,7 +548,7 @@ def _vhr_decoding(
                 model_kwargs_cd,
                 is_encoder_decoder=self.config.is_encoder_decoder,
             )
-        if use_visual_evidence_gate:
+        if use_text_contrast:
             input_ids_tc = torch.cat([input_ids_tc, next_tokens[:, None]], dim=-1)
             model_kwargs_tc = self._update_model_kwargs_for_generation(
                 outputs_tc,
@@ -427,7 +565,7 @@ def _vhr_decoding(
         del outputs
         if use_aux_contrast:
             del outputs_cd
-        if use_visual_evidence_gate:
+        if use_text_contrast:
             del outputs_tc
 
     if streamer is not None:
@@ -473,6 +611,27 @@ def _vhr_decoding(
             / max(1, visual_allowed_switch_steps),
             "blocked_support_margin_mean": visual_blocked_margin_sum
             / max(1, visual_blocked_switch_steps),
+        }
+    if use_counterfactual_alignment:
+        self._last_vhr_counterfactual_alignment_stats = {
+            "plausible_tokens": alignment_total_plausible_tokens,
+            "aligned_plausible_tokens": alignment_aligned_plausible_tokens,
+            "aligned_fraction": alignment_aligned_plausible_tokens
+            / max(1, alignment_total_plausible_tokens),
+            "positive_aligned_tokens": alignment_positive_tokens,
+            "negative_aligned_tokens": alignment_negative_tokens,
+            "negative_fraction_of_aligned": alignment_negative_tokens
+            / max(1, alignment_aligned_plausible_tokens),
+            "retained_abs_delta_fraction": alignment_retained_abs_delta
+            / max(1e-12, alignment_total_abs_delta),
+        }
+    if use_stability_guard:
+        self._last_vhr_stability_stats = {
+            "total_steps": stability_total_steps,
+            "guarded_steps": stability_guarded_steps,
+            "guard_rate": stability_guarded_steps / max(1, stability_total_steps),
+            "candidate_cycle_steps": stability_candidate_cycle_steps,
+            "intervention_cycle_steps": stability_intervention_cycle_steps,
         }
 
     if return_dict_in_generate:
@@ -2069,6 +2228,8 @@ def generation_config_init(self, **kwargs):
     self.vhr_disagreement_gate = kwargs.pop("vhr_disagreement_gate", False)
     self.vhr_switch_diagnostics = kwargs.pop("vhr_switch_diagnostics", False)
     self.vhr_visual_evidence_gate = kwargs.pop("vhr_visual_evidence_gate", False)
+    self.vhr_counterfactual_alignment = kwargs.pop("vhr_counterfactual_alignment", False)
+    self.vhr_stability_guard = kwargs.pop("vhr_stability_guard", False)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters

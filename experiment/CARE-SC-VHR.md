@@ -3,7 +3,7 @@
 > 开始日期：2026-07-17
 > 分支：`research/care-scvhr`
 > 起始检查点：`7e1434c`（tag: `rrscvhr-efficiency-quality-20260717`）
-> 状态：方法、实验门槛和全新 dev/locked-validation/reserved-test 划分已预注册；尚未实现或运行实验。
+> 状态：方法、隔离划分和实现均已完成；纯函数测试、开放描述烟雾与 binary 回退等价验证通过，尚未运行100图 dev。
 
 ## 1. 研究动机
 
@@ -175,3 +175,8 @@ VEG、PD、DG 已有冻结负结果，不在新划分上重复调参。正式论
 - 2026-07-17：新增 `scripts/create_care_chair_splits.py`，扫描 265 个历史 CHAIR ID/结果文件，其中191个包含可解析 image/question ID；共排除历史唯一 ID 2852 个。
 - 2026-07-17：从剩余 37,652 个 COCO-val 图像中以固定 seed `20260717` 生成 dev/validation/test=100/100/500，三套之间及与历史集合均零重叠。
 - 2026-07-17：划分 SHA256：dev `86850d50...ae32e`，validation `e78a04a0...964d4`，test `5031aede...196ff6`；完整来源和每个历史文件 hash 见 `experiment/care_chair_splits_manifest.json`。
+- 2026-07-17：新增独立 generation flags `vhr_counterfactual_alignment` 和 `vhr_stability_guard`；默认关闭，不改变 VHR/SC/RR 路径。新增三分支全词表符号对齐、逐 token exact-cycle guard 和诊断统计。
+- 2026-07-17：三个纯函数测试通过：正/负符号对齐、exact-cycle candidate 检测、仅对 CARE 独有循环回退。
+- 2026-07-17：LLaVA CARE dev 首图 `33532` 的 VHR/SC/CA/CARE 四方法烟雾全部成功。CA 与 CARE 文本一致，aligned plausible token fraction=51.38%，其中负向对齐占67.69%，保留约50.24%的 intervention absolute delta；本样本未触发 cycle guard。
+- 2026-07-17：用旧 VEG runner 重新生成同一图的 VHR/SC 控制输出，`question_id/text/gt/ans_conf/question` 与 CARE runner 逐字段一致，证明新 flags 未污染标准路径。
+- 2026-07-17：POPE popular 前10题 binary smoke 中，CARE 与 VHR 10/10 的 ID、文本、标签、confidence、问题逐字段一致；route 全为 `vhr`，没有建立 CARE 诊断字段。
