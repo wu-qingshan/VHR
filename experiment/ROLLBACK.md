@@ -65,3 +65,5 @@ PD 新 dev 负结果完成后的检查点使用标签 `pdscvhr-dev-negative-2026
 DG-SC-VHR 预注册实现与成功烟雾测试的检查点标签为 `dgscvhr-preregistered-20260717`；生成结果保持未跟踪。
 
 DG dev 负结果与机制结论的检查点标签为 `dgscvhr-dev-negative-20260717`。锁定 validation 未运行。
+
+标准 SC token-switch 诊断实现与一图逐字等价验证的检查点标签为 `scvhr-switch-diagnostic-ready-20260717`。

@@ -160,6 +160,7 @@ class HallucinationTest:
                         "vhr_base_contrast": True,
                         "vhr_positive_delta_contrast": "pdscvhr" in self.method,
                         "vhr_disagreement_gate": "dgscvhr" in self.method,
+                        "vhr_switch_diagnostics": "scvhrdiag" in self.method,
                         "vhr_logit_alpha": self.vhr_logit_alpha,
                         "vhr_logit_beta": self.vhr_logit_beta,
                     }
@@ -305,6 +306,8 @@ class HallucinationTest:
             }
             if "dgscvhr" in self.method:
                 result_row["routing_stats"] = dict(self.model._last_vhr_routing_stats)
+            if "scvhrdiag" in self.method:
+                result_row["switch_stats"] = dict(self.model._last_vhr_switch_stats)
             output_file.write(json.dumps(result_row) + "\n")
 
         output_file.close()

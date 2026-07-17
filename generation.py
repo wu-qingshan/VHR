@@ -103,6 +103,7 @@ def _vhr_decoding(
     use_vcd = images_cd is not None
     use_base_contrast = generation_config.vhr_base_contrast
     use_disagreement_gate = generation_config.vhr_disagreement_gate
+    use_switch_diagnostics = generation_config.vhr_switch_diagnostics
     use_aux_contrast = use_vcd or use_base_contrast
     if use_vcd and use_base_contrast:
         raise ValueError("Choose either noisy-image VCD or VHR self-contrast, not both")
@@ -110,9 +111,20 @@ def _vhr_decoding(
         raise ValueError("Full VCD is not supported with the abandoned CC-VHR consensus score")
     if use_disagreement_gate and not use_base_contrast:
         raise ValueError("Disagreement gating requires VHR self-contrast")
+    if use_switch_diagnostics and not use_base_contrast:
+        raise ValueError("Switch diagnostics require VHR self-contrast")
 
     disagreement_total_steps = 0
     disagreement_contrast_steps = 0
+    switch_total_steps = 0
+    switch_branch_disagreement_steps = 0
+    switch_selected_steps = 0
+    switch_same_argmax_steps = 0
+    switch_disagreement_steps = 0
+    switch_disagreement_no_switch_steps = 0
+    switch_same_selected_delta_sum = 0.0
+    switch_same_vhr_delta_sum = 0.0
+    switch_same_margin_sum = 0.0
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -224,6 +236,9 @@ def _vhr_decoding(
         # Clone is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
         # (the clone itself is always small)
         next_token_logits = outputs.logits.clone()[:, -1, :].float()
+        diagnostic_vhr_argmax = None
+        diagnostic_base_argmax = None
+        diagnostic_delta = None
 
         if use_aux_contrast:
             model_inputs_cd = self.prepare_inputs_for_generation(input_ids, **model_kwargs_cd)
@@ -232,6 +247,11 @@ def _vhr_decoding(
             set_vhr_phase(self, "reuse" if use_vcd else "vanilla")
             outputs_cd = self(**model_inputs_cd, return_dict=True)
             next_token_logits_cd = outputs_cd.logits.clone()[:, -1, :].float()
+
+            if use_switch_diagnostics:
+                diagnostic_vhr_argmax = next_token_logits.argmax(dim=-1, keepdim=True)
+                diagnostic_base_argmax = next_token_logits_cd.argmax(dim=-1, keepdim=True)
+                diagnostic_delta = next_token_logits - next_token_logits_cd
 
             contrast_alpha = generation_config.cd_alpha if use_vcd else generation_config.vhr_logit_alpha
             contrast_beta = generation_config.cd_beta if use_vcd else generation_config.vhr_logit_beta
@@ -284,6 +304,31 @@ def _vhr_decoding(
         else:  # argmax
             next_tokens = torch.argmax(next_token_scores, dim=-1)
 
+        if use_switch_diagnostics:
+            selected = next_tokens.unsqueeze(-1)
+            branch_disagreement = diagnostic_vhr_argmax != diagnostic_base_argmax
+            selected_switch = selected != diagnostic_vhr_argmax
+            same_argmax_switch = (~branch_disagreement) & selected_switch
+            disagreement_switch = branch_disagreement & selected_switch
+            disagreement_no_switch = branch_disagreement & (~selected_switch)
+
+            switch_total_steps += branch_disagreement.numel()
+            switch_branch_disagreement_steps += int(branch_disagreement.sum().item())
+            switch_selected_steps += int(selected_switch.sum().item())
+            switch_same_argmax_steps += int(same_argmax_switch.sum().item())
+            switch_disagreement_steps += int(disagreement_switch.sum().item())
+            switch_disagreement_no_switch_steps += int(disagreement_no_switch.sum().item())
+
+            if same_argmax_switch.any():
+                chosen_delta = diagnostic_delta.gather(-1, selected)
+                vhr_delta = diagnostic_delta.gather(-1, diagnostic_vhr_argmax)
+                chosen_score = next_token_scores.gather(-1, selected)
+                vhr_score = next_token_scores.gather(-1, diagnostic_vhr_argmax)
+                mask = same_argmax_switch.float()
+                switch_same_selected_delta_sum += float((chosen_delta * mask).sum().item())
+                switch_same_vhr_delta_sum += float((vhr_delta * mask).sum().item())
+                switch_same_margin_sum += float(((chosen_score - vhr_score) * mask).sum().item())
+
         # finished sentences should have their next token be a padding token
         if has_eos_stopping_criteria:
             next_tokens = next_tokens * unfinished_sequences + pad_token_id * (1 - unfinished_sequences)
@@ -322,6 +367,26 @@ def _vhr_decoding(
             "contrast_steps": disagreement_contrast_steps,
             "total_steps": disagreement_total_steps,
             "contrast_rate": disagreement_contrast_steps / max(1, disagreement_total_steps),
+        }
+    if use_switch_diagnostics:
+        self._last_vhr_switch_stats = {
+            "total_steps": switch_total_steps,
+            "branch_disagreement_steps": switch_branch_disagreement_steps,
+            "selected_switch_steps": switch_selected_steps,
+            "same_argmax_switch_steps": switch_same_argmax_steps,
+            "disagreement_switch_steps": switch_disagreement_steps,
+            "disagreement_no_switch_steps": switch_disagreement_no_switch_steps,
+            "branch_disagreement_rate": switch_branch_disagreement_steps / max(1, switch_total_steps),
+            "selected_switch_rate": switch_selected_steps / max(1, switch_total_steps),
+            "same_argmax_switch_rate": switch_same_argmax_steps / max(
+                1, switch_total_steps - switch_branch_disagreement_steps
+            ),
+            "same_switch_selected_delta_mean": switch_same_selected_delta_sum
+            / max(1, switch_same_argmax_steps),
+            "same_switch_vhr_delta_mean": switch_same_vhr_delta_sum
+            / max(1, switch_same_argmax_steps),
+            "same_switch_score_margin_mean": switch_same_margin_sum
+            / max(1, switch_same_argmax_steps),
         }
 
     if return_dict_in_generate:
@@ -1916,6 +1981,7 @@ def generation_config_init(self, **kwargs):
     self.vhr_base_contrast = kwargs.pop("vhr_base_contrast", False)
     self.vhr_positive_delta_contrast = kwargs.pop("vhr_positive_delta_contrast", False)
     self.vhr_disagreement_gate = kwargs.pop("vhr_disagreement_gate", False)
+    self.vhr_switch_diagnostics = kwargs.pop("vhr_switch_diagnostics", False)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters
