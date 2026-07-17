@@ -1,0 +1,792 @@
+{
+  "annotations": "data/coco/annotations/captions_val2014.json",
+  "annotations_sha256": "7da4cc45cb76ee1642d163e846e1e0a33feffac2e841c9c426d585ea499165a4",
+  "seed": 20260717,
+  "coco_val_images": 40504,
+  "history_files_scanned": 265,
+  "history_files_with_ids": {
+    "ccvhr_dev_results/instructblip-vicuna-7b/0-chair_0-ccvhr-consensus-remove-h18-n500-512.json": {
+      "count": 100,
+      "sha256": "e5cc5bd1e4bc1c22ebd953bd16a82c0b7505e3a59c7f3fae5c45897ca08e2c9d"
+    },
+    "ccvhr_dev_results/instructblip-vicuna-7b/0-chair_0-ccvhr-consensus-zero-h18-n500-512.json": {
+      "count": 100,
+      "sha256": "cf0b811d988fcac131783f12dd06d93e385f3bf254c26230933ac1477fe91a2e"
+    },
+    "dev2_results/instructblip-vicuna-7b/0-chair_0-csvhr-nr3-h18-512.json": {
+      "count": 100,
+      "sha256": "fee72d09f7408cc9a20079a33a8b02b0538b5b5db8174ec32e817d7cddb9bbf6"
+    },
+    "dev2_results/instructblip-vicuna-7b/0-chair_0-csvhr-rp11-h18-512.json": {
+      "count": 100,
+      "sha256": "c9796c9fbe0005339bdad05414b0d1b5ba28a30ec2e39f8174c2cc72ff71c878"
+    },
+    "dev2_results/instructblip-vicuna-7b/0-chair_0-vhr-nr3-h18-512.json": {
+      "count": 100,
+      "sha256": "b7c872a25a0e926dc93f59a27b735815382acdda87661a5222d47562f2902391"
+    },
+    "dev2_results/instructblip-vicuna-7b/0-chair_0-vhr-rp11-h18-512.json": {
+      "count": 100,
+      "sha256": "a0817242ed4838d38f83e8d7fe49b06e365603c972dced86626d6d43322e1928"
+    },
+    "dev3_results/instructblip-vicuna-7b/0-chair_0-cvhr-calibrated-h18-512.json": {
+      "count": 100,
+      "sha256": "3cf5e8872f7fedc77e88537324847cf1bcfad3bede8ebff9916de1a5494ddf7b"
+    },
+    "dev3_results/instructblip-vicuna-7b/0-chair_0-dlvhr-linear50-h18-512.json": {
+      "count": 100,
+      "sha256": "99dc84f521a8377f45ee716d9bb090ba1429991a6b0003e7b90173cf15aa3703"
+    },
+    "dev3_results/instructblip-vicuna-7b/0-chair_0-dsvhr-dir375-h18-512.json": {
+      "count": 100,
+      "sha256": "14d6ce79b3936cc1bcdb1e70ee0fd0623d277b6ba70c8d1bd8fa6d1dbb78954c"
+    },
+    "dev3_results/instructblip-vicuna-7b/0-chair_0-dsvhr-dir625-h18-512.json": {
+      "count": 100,
+      "sha256": "460707fea044f309556e2292a253c4115203d3df62c976890c90d0490cb7bd3e"
+    },
+    "dev_results/instructblip-vicuna-7b/0-chair_0-csvhr-dir25-h18-512.json": {
+      "count": 100,
+      "sha256": "0a8905e4eb24ce563b7db6e62d5e9cec54c9d0fa2a3155162a268848a6e5a418"
+    },
+    "dev_results/instructblip-vicuna-7b/0-chair_0-csvhr-dir50-h18-512-cycle3.json": {
+      "count": 100,
+      "sha256": "28636b936e1d824121e575b832b19c98b399b8921ca0a4035dbe3758e12efebe"
+    },
+    "dev_results/instructblip-vicuna-7b/0-chair_0-csvhr-dir50-h18-512.json": {
+      "count": 100,
+      "sha256": "73078d14d9b2255ee7d1d08b695fb2492574cc3348aac371746d0e4f4badd34c"
+    },
+    "dev_results/instructblip-vicuna-7b/0-chair_0-dsvhr-dir50all-h18-512.json": {
+      "count": 100,
+      "sha256": "73078d14d9b2255ee7d1d08b695fb2492574cc3348aac371746d0e4f4badd34c"
+    },
+    "dev_results/instructblip-vicuna-7b/0-chair_0-svhr-mag25-h18-512.json": {
+      "count": 100,
+      "sha256": "8b0c0007b72332f19f5996f03f7ec9d82ed81bbb2f7cb8b60a8e89006f88d280"
+    },
+    "dev_results/instructblip-vicuna-7b/0-chair_0-vhr-dev-h18-512-cycle3.json": {
+      "count": 100,
+      "sha256": "f3b29c6de3dbf91c6b520a979014a1430c3e70fda9c26243de6d75c5fda53a6a"
+    },
+    "dev_results/instructblip-vicuna-7b/0-chair_0-vhr-dev-h18-512.json": {
+      "count": 100,
+      "sha256": "a501109b9d9d98fd06a5bf01bbe117337baa9c6e099427374d2acadc7a3a951d"
+    },
+    "dgscvhr_dev_results/llava-1.5-7b-hf/0-chair_0-dgscvhr-unseen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "8a4a1e718117d1ce41e5d4eefceed3dee913c2b67bfee4aaef9bc6d795271854"
+    },
+    "dgscvhr_smoke_results/llava-1.5-7b-hf/0-chair_0-dgscvhr-unseen-a05-b01-64.json": {
+      "count": 1,
+      "sha256": "397fe5fd75ed8f12eb213eefa40588add23714aeaf39261e0c6d8741af88dff6"
+    },
+    "experiment/dev_chair_ids.json": {
+      "count": 100,
+      "sha256": "e1bafea85bad8e479c6fa5d96325e4a484f0dbecb1a31ab47f234fa5c6be16bc"
+    },
+    "experiment/pdscvhr_dev_chair_ids.json": {
+      "count": 100,
+      "sha256": "700282feaa8f9df7a733b8904b59914790568221afb002d3f606ed6d4c922224"
+    },
+    "experiment/pdscvhr_validation_chair_ids.json": {
+      "count": 100,
+      "sha256": "4df94b51cbfa71cea17f1718fb2053f560282a3d2724dd72d8dcecbb8b8b9678"
+    },
+    "experiment/validation_chair_ids.json": {
+      "count": 100,
+      "sha256": "d326e4035225e8a280ce54a347489beffb504cbd54126467b22c663d4f510b72"
+    },
+    "llava15_dev_results/llava-1.5-7b-hf/0-chair_0-dlvhr-llava15-dev-512.json": {
+      "count": 100,
+      "sha256": "8283cc607b6f06975985d4265f1e06a03861baefbcb7bdc157510d88187eb5a4"
+    },
+    "llava15_dev_results/llava-1.5-7b-hf/0-chair_0-vhr-llava15-dev-512.json": {
+      "count": 100,
+      "sha256": "650a850fb117f787267cbd4a137509ae897e69f567f4a8bb7350f663fed31e26"
+    },
+    "llava15_scvhr_dev_results/llava-1.5-7b-hf/0-chair_0-scvhr-llava15-frozen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "f9bda269c909d387ece337081218e8b6b33cfd621b0490d1d93a8012826f4719"
+    },
+    "llava15_scvhr_smoke_results/llava-1.5-7b-hf/0-chair_0-scvhr-llava15-smoke-64.json": {
+      "count": 9,
+      "sha256": "3f581427d7e45d612037061a192089c310a8187872f709f04b92abc56cd6ce6e"
+    },
+    "llava15_scvhr_validation_results/llava-1.5-7b-hf/0-chair_0-scvhr-llava15-frozen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "199858180773a1e0a1737233c8c3d9c8a34de993e9ff8a232d461cc042044749"
+    },
+    "llava15_validation_results/llava-1.5-7b-hf/0-chair_0-dlvhr-llava15-val-512.json": {
+      "count": 100,
+      "sha256": "5b45d03687df272cc1d34b4f3188d51f2ca036aa6f78cdf199f704560965cd19"
+    },
+    "llava15_validation_results/llava-1.5-7b-hf/0-chair_0-vhr-llava15-val-512.json": {
+      "count": 100,
+      "sha256": "379b75717f0539b9381158586dba4860b9c106ffb1e84b7ff9cb0adda8932810"
+    },
+    "llava15_zero_dev_results/llava-1.5-7b-hf/0-chair_0-zdvhr-linear50-llava15-dev-512.json": {
+      "count": 100,
+      "sha256": "487fe34991e7a65cf9eccedfa27b744289eca7866598e1e20c576b466f0ae034"
+    },
+    "llava15_zero_dev_results/llava-1.5-7b-hf/0-chair_0-zvhr-mag50-llava15-dev-512.json": {
+      "count": 100,
+      "sha256": "7824e67ebd03ee5dece519600663430b0a5c41fdca17ce2777478d310320250d"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chair_0-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "5a3a8a1c33acb8125990e881ef7b0c8d68c6c7a56b7fa3008527ee86c7b8b781"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chair_1-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "0cfed8c38daa9d8146bd2fcf910a0926b20b109348532d0e2e3b1a4b6d604c83"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chair_2-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "cd3bbc298a6183cc22ded997e46e5b9ce3ce4813897fdd92e46110722f26e588"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chair_3-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "c843ce82a07b4df9cebe438b2d2346d912446dee5e45ef62d03c955372ce2e09"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chair_4-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "0490bc576866d7294e521d1bebe144013464cb3f520d285caeba8f601d7e34f4"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chairmetrics_0-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "f8a8b4d5a8e6aa61c9b78551a8966bec58061652e190cd5081fc59a1b2508a31"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chairmetrics_1-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "44deccb0fd89d8fbd8546da7f39515fe5f92c2ebfc935f972b87cfa30b7339f1"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chairmetrics_2-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "ae71d97c5679f7b1b35114e1f85f356417fd032ec58c376260c867f0a9bcb1bc"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chairmetrics_3-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "e29e2b0ce6f88d6c7a62be66f17f344963393d2baa67dc1fc2a3d6a93e36a826"
+    },
+    "official_linear_results/instructblip-vicuna-7b/chairmetrics_4-dlvhr-linear50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "191b1e0767c4585522c91872cc9a315f32a79a59bf28edc36ee44180ea86f4c8"
+    },
+    "official_results/instructblip-vicuna-7b/chair_0-csvhr-dir50-h18-official-512-cycle3.json": {
+      "count": 500,
+      "sha256": "688dd72e671d2435c841c07e057f17ab94954ab4ca6fba0c6e570baf5c0d5538"
+    },
+    "official_results/instructblip-vicuna-7b/chair_0-csvhr-dir50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "5daec8c71506921e9dbf0b7f9b004921c342755a6eea81b3b2b522368a768df6"
+    },
+    "official_results/instructblip-vicuna-7b/chair_1-csvhr-dir50-h18-official-512-cycle3.json": {
+      "count": 500,
+      "sha256": "e97421389c566863d262189f488b64dbb7259bd8a68178c211035302a2798b2b"
+    },
+    "official_results/instructblip-vicuna-7b/chair_1-csvhr-dir50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "860e977eb315986fe2038a29945c0e9bab70ba742260a3dcf0bcffb80c005c20"
+    },
+    "official_results/instructblip-vicuna-7b/chair_2-csvhr-dir50-h18-official-512-cycle3.json": {
+      "count": 500,
+      "sha256": "88047606cf241bc84418a39e992b55a1e532137ff8b2b0d30d6da69a2fda11b8"
+    },
+    "official_results/instructblip-vicuna-7b/chair_2-csvhr-dir50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "d2e55d5d08d23d1f78f16bf92b3643e4869340f23314cbf75a19d94f0dd2fcf6"
+    },
+    "official_results/instructblip-vicuna-7b/chair_3-csvhr-dir50-h18-official-512-cycle3.json": {
+      "count": 500,
+      "sha256": "f93c8ee4a9d7168b01cfade09539a5cf954edf921cea6de143021554e0c5f002"
+    },
+    "official_results/instructblip-vicuna-7b/chair_3-csvhr-dir50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "b901c51a88710788cf7ea66ca6c1d25603cfc44330cbbd6a79bb770eb23a4508"
+    },
+    "official_results/instructblip-vicuna-7b/chair_4-csvhr-dir50-h18-official-512-cycle3.json": {
+      "count": 500,
+      "sha256": "ffe386a937340ff1c3bccaccfc31e719c52add8dfeca66f9a4fda28b5c367b4e"
+    },
+    "official_results/instructblip-vicuna-7b/chair_4-csvhr-dir50-h18-official-512.json": {
+      "count": 500,
+      "sha256": "1d8ba4faad2a034f74e71c8d4ef644fb0d2fc63107c79ae390eb521ddc90774a"
+    },
+    "pdscvhr_dev_results/llava-1.5-7b-hf/0-chair_0-pdscvhr-unseen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "3da50bed0eae7b502e59875a8b64f3244f1b4ea459e84e5edb1d6378964c4c37"
+    },
+    "pdscvhr_dev_results/llava-1.5-7b-hf/0-chair_0-scvhr-unseen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "5a8ae1da663893f905778c3059ce5072024620e751cf6aba73ab1ec780b6a14b"
+    },
+    "pdscvhr_dev_results/llava-1.5-7b-hf/0-chair_0-vhr-unseen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "2ab7c5ef1d4328bec6c1128df7a46b6e6fa5e6737ae9ecb299bf0f1f758c054e"
+    },
+    "pdscvhr_smoke_results/llava-1.5-7b-hf/0-chair_0-pdscvhr-unseen-a05-b01-64.json": {
+      "count": 1,
+      "sha256": "2b1e4c1cc326255bf78f4e49a6a1da7a66713cd2be68d69667cece3a4d7a308a"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chair_0-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "9f2c3c45948b8e12b4d786d25806b0267a8ea39df3e6e1bc3a5a018f12d1b9d7"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chair_1-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "3a5dcaccc73008a12eb36d69ebfc98e6e3d28a120ffd88e3b72d1de8fd95fd19"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chair_2-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "8f1dbd8918fa158462ad76ba0c8357a830636147b53aff49662fdf88673ac2f8"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chair_3-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "df9b6174d519b57f93dcd5af699e042175c15f08ee50b401db1e3e937022a75c"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chair_4-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "bddd90e8457388ccf5a79ee482ba3582cb6e77a88d8e28d13cf612157e4e0147"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chairmetrics_0-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "37549ef79a22b2e8488d08fdf4b4cdbbb09216b5727d66430308eb27d2893b79"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chairmetrics_1-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "3c72d352961d5a169f65e78131e3f036947d76f6fbe73fa33da2162ce4ebb2d6"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chairmetrics_2-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "1991ef6a29d19709fe0829885e20d9eb7a01e616725874f87f9441e4e91afe3d"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chairmetrics_3-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "17c827e1221fe54399fc4eb270e96d36740fbc19668d7876f25ce943b074325b"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/instructblip-vicuna-7b/chairmetrics_4-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "d011b2f18ab909631e3dd25180ffd35790c898b4ea194e2d67503e524d2b6487"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/llava-1.5-7b-hf/chair_0-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "a11974ceb8d9b76e9a8aad346274d45d23f2df97394c9fd3a51470e5f879005c"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/llava-1.5-7b-hf/chair_1-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "a51b118a44dbf54f64e0acbd02427056681a37fed238709990e43ad469dad5ec"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/llava-1.5-7b-hf/chair_2-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "9ff33455d80d0daf74abb1434f2c43bfc244c7e73df0d4bbc608d40dc1ab78b9"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/llava-1.5-7b-hf/chair_3-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "42c7c65e27f300d533c79922d928ae763373dc36e42951c478761f28078ce039"
+    },
+    "results/_archive_dirty_vhr_h18/nested_buggy_path_home/nlp/VHR/models/llava-1.5-7b-hf/chair_4-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "a0d7006158e432eb26daa169684b4952226a6421c68f9081e92ac64c1dfc1726"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chair_0-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "9f2c3c45948b8e12b4d786d25806b0267a8ea39df3e6e1bc3a5a018f12d1b9d7"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chair_1-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "3a5dcaccc73008a12eb36d69ebfc98e6e3d28a120ffd88e3b72d1de8fd95fd19"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chair_2-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "8f1dbd8918fa158462ad76ba0c8357a830636147b53aff49662fdf88673ac2f8"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chair_3-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "df9b6174d519b57f93dcd5af699e042175c15f08ee50b401db1e3e937022a75c"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chair_4-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "bddd90e8457388ccf5a79ee482ba3582cb6e77a88d8e28d13cf612157e4e0147"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chairmetrics_0-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "0e9601a5bd109a0a6de2131f3632918641aae923f695fd122552aed9a30fe98f"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chairmetrics_1-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "c27bfa57d669336748e68ff980c067aeafe35645a096c7d381e3406a977ddc02"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chairmetrics_2-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "fa6fb02391ca39c78b7e8fe9ba068bbd0fb821d4a3bd23b22805010230009139"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chairmetrics_3-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "e9c91bb16384445927a470c7a0011a5e79d1b8943a4dce5eee24cedb4a7e0660"
+    },
+    "results/instructblip-vicuna-7b/_old_h18/chairmetrics_4-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "086afc2df647545f9f40649416fe82893157092d73ce05cea6cd97c94e996140"
+    },
+    "results/instructblip-vicuna-7b/chair_0-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "12902338aed0fe274d79e9b2e898e90bee769d7f15fb01dd1093c9da25e0afc4"
+    },
+    "results/instructblip-vicuna-7b/chair_0-greedy-512.json": {
+      "count": 500,
+      "sha256": "ab4268d6773e8991fe7bd4757239d4401aa22449139e4c03d81db4f0302d58e1"
+    },
+    "results/instructblip-vicuna-7b/chair_0-vhr-h18-512-cycle3.json": {
+      "count": 500,
+      "sha256": "82c55cd9503d150ebad25892fe438d51bad99843f9ebb333d070acbf80baaa6d"
+    },
+    "results/instructblip-vicuna-7b/chair_0-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "82c55cd9503d150ebad25892fe438d51bad99843f9ebb333d070acbf80baaa6d"
+    },
+    "results/instructblip-vicuna-7b/chair_1-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "0a99de865d3a551a9c997ef87117c659e99c761b28af19eeb8ff724f7794e9ee"
+    },
+    "results/instructblip-vicuna-7b/chair_1-greedy-512.json": {
+      "count": 500,
+      "sha256": "37abca641753f102ee0c9ffb0ca1ee29a4f1136f206cb8183714c90b4f732337"
+    },
+    "results/instructblip-vicuna-7b/chair_1-vhr-h18-512-cycle3.json": {
+      "count": 500,
+      "sha256": "b49e2ab57676219187dc98f844134545991028964eec85570373e7c781d60bb2"
+    },
+    "results/instructblip-vicuna-7b/chair_1-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "f047415a8e7a2a2d346dd64a434b8cd6f524e70f01d740f6019b7e1ad82f1952"
+    },
+    "results/instructblip-vicuna-7b/chair_2-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "c62e1df7de405c1dc9f5c42961cccced10f45c5f21c9da0632e184bd0ea74c10"
+    },
+    "results/instructblip-vicuna-7b/chair_2-greedy-512.json": {
+      "count": 500,
+      "sha256": "9de2fd63b43a44cb807de514daab628ad1266ae6dada51cb5740441ee7e1608e"
+    },
+    "results/instructblip-vicuna-7b/chair_2-vhr-h18-512-cycle3.json": {
+      "count": 500,
+      "sha256": "7d9eb1931500434c92be82132b150d3e4490a4418b2e39dde2f61d26043340de"
+    },
+    "results/instructblip-vicuna-7b/chair_2-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "7d9eb1931500434c92be82132b150d3e4490a4418b2e39dde2f61d26043340de"
+    },
+    "results/instructblip-vicuna-7b/chair_3-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "0193a5340fe928244432bee6504ddca02ffb06ef7a3cc27cee344a766b491961"
+    },
+    "results/instructblip-vicuna-7b/chair_3-greedy-512.json": {
+      "count": 500,
+      "sha256": "4ab25d9f1bd265447b21f82345440df0c13943ab14868e79341b57d5e70c83ab"
+    },
+    "results/instructblip-vicuna-7b/chair_3-vhr-h18-512-cycle3.json": {
+      "count": 500,
+      "sha256": "5ab30e1be01e4ccf1599a04daa924281d6cb7d0d5b2acc729527af44d9b34ef6"
+    },
+    "results/instructblip-vicuna-7b/chair_3-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "470769d6cb4e24e396b36b2651195f63f4f686425ffb50c9a90a0d171bca6220"
+    },
+    "results/instructblip-vicuna-7b/chair_4-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "ba92e96a5b91bd93162b0a4e26022d3c0de0d3c4173d11e5bedd81adda0c6cbe"
+    },
+    "results/instructblip-vicuna-7b/chair_4-greedy-512.json": {
+      "count": 500,
+      "sha256": "0baeee88c14b5fefd846aec5be4e93558b83d56ba3b96a17fabab414b9fedb69"
+    },
+    "results/instructblip-vicuna-7b/chair_4-vhr-h18-512-cycle3.json": {
+      "count": 500,
+      "sha256": "8b3959b60365d014dc492a315f42b67fd305c89b8ca35af03f22f6412fb652ea"
+    },
+    "results/instructblip-vicuna-7b/chair_4-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "4a69ba1a72963324274248eb0b381697d2feb4e1a1db7f18818ca9a06fd5cf4d"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_0-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "e0c1cf37a04252dff800cd1781260232161129d40389982289469182ad73bf0b"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_0-greedy-512.json": {
+      "count": 500,
+      "sha256": "30e6a6e1df09db644968749d2a55bbadb486a5948d4dacc97c2da177d2c52005"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_0-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "df163d0ed7bac63b304963db44bd7f68c5b245965506daf5b8bb8443bc2926ac"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_1-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "5a44c8f030c5a0d2066fa9420241e9ff2a04cdb9b6bbc5901a60dc79afa2f94c"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_1-greedy-512.json": {
+      "count": 500,
+      "sha256": "e95ad8cc65eff391318f4f83b0caea4476d6053dd9ae1a8b89cd40bd22f2d1ab"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_1-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "6a537104bc525a873cb53bde1a46a7ef3382dda00dc911020830c799c8890c7f"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_2-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "9b6e77494eea2016779856deb7bf9fef1bfb921d9e1e1d3adb8a847d4efc8546"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_2-greedy-512.json": {
+      "count": 500,
+      "sha256": "a5651edd619ba63a41501154e5b4579dd9eeabf94219a477800402f4dcb6a813"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_2-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "ce20c4e63257e99a31e004e3b0e70b655b46f06d5947df10d9e09cfb135f5bb2"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_3-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "a73de3238b2bb77ef7c7d405117cda03e9132660d011ab427c96fba26cdf609d"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_3-greedy-512.json": {
+      "count": 500,
+      "sha256": "6efd99a5ec963293755f030f64aa4585773f03a2aaf1dc33bdbb66fa28feb19b"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_3-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "5ac65e352fe7e2505b4b2c367c49d467371c67bbcae43f67ff8256e4dee3885a"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_4-avhr-h18-t1.0-a0.5-r2.0-512.json": {
+      "count": 500,
+      "sha256": "7511fbf19e3770a0ce9fea74262ef4aac3e640a9ac651f37f49ce574ca9851b0"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_4-greedy-512.json": {
+      "count": 500,
+      "sha256": "a6956b7050f3a95c5db6775488b3404cff24d34fd202952f1b6e941b2c92bfca"
+    },
+    "results/instructblip-vicuna-7b/chairmetrics_4-vhr-h18-512.json": {
+      "count": 500,
+      "sha256": "485fc839aba2b2cb5cab3e6a7e754df0d09d408acd75a9b5ab9230282f9d31b0"
+    },
+    "results/llava-1.5-7b-hf/chair_0-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "a11974ceb8d9b76e9a8aad346274d45d23f2df97394c9fd3a51470e5f879005c"
+    },
+    "results/llava-1.5-7b-hf/chair_1-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "a51b118a44dbf54f64e0acbd02427056681a37fed238709990e43ad469dad5ec"
+    },
+    "results/llava-1.5-7b-hf/chair_2-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "9ff33455d80d0daf74abb1434f2c43bfc244c7e73df0d4bbc608d40dc1ab78b9"
+    },
+    "results/llava-1.5-7b-hf/chair_3-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "42c7c65e27f300d533c79922d928ae763373dc36e42951c478761f28078ce039"
+    },
+    "results/llava-1.5-7b-hf/chair_4-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "a0d7006158e432eb26daa169684b4952226a6421c68f9081e92ac64c1dfc1726"
+    },
+    "results/llava-1.5-7b-hf/chairmetrics_0-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "6f01a2c43c441676bd7f4e6dff3d13a05493bf7863c41630b272485db9b97e68"
+    },
+    "results/llava-1.5-7b-hf/chairmetrics_1-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "e5c30948d9e3ce09956dc6bc608bb031b04d0e494704f477f0ac98275804fb1e"
+    },
+    "results/llava-1.5-7b-hf/chairmetrics_2-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "bcacd0045320be73586aca014f049e9ebf949f24881ada85daf19878d61425a9"
+    },
+    "results/llava-1.5-7b-hf/chairmetrics_3-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "ef062d43a6a5d4ef189f5e877e453aa5982606f371aea9173850cc05dc476896"
+    },
+    "results/llava-1.5-7b-hf/chairmetrics_4-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "3b7bcff4921c96adc29efab6eac1e254a988c03dc081cc4473f9eb4131dffbd9"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_0-eah-512.json": {
+      "count": 500,
+      "sha256": "78cc16019aaa1ce9ec1100561c693a723969724c849559258f9f459944cb2848"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_0-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "ed659b88eeda1084ef5c3d7b0f0c7d8112148659ecbc0bcf839c5fcafba95212"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_1-eah-512.json": {
+      "count": 500,
+      "sha256": "1e100d8074a341e317af738b9d139340f250a429e07299905e63925d7dd477ec"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_1-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "0517b49c359495958b9d9c8d61088e8cd5a780cedf91da68bcbe9edf38715841"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_2-eah-512.json": {
+      "count": 500,
+      "sha256": "1e56d4d2ac313b24626ca88749ee91dfd9217e3def36a1d7d22354fa4c2f45f0"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_2-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "baaa04c919291f5543261ff251ba701399d3e494b5ffc4c1b489db881c448c1e"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_3-eah-512.json": {
+      "count": 500,
+      "sha256": "95d19f420aef97188a908eabe4c4da404249ae134345012d7d2236817f791a2f"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_3-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "e49c9a11af864f91ce4bada6a1806d76f2df56594b0259a3fd2bd36d8a03d9f3"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_4-eah-512.json": {
+      "count": 500,
+      "sha256": "13c64a0d1b82479290b6b853a4bffe50114aa157fbe7d23c070e2ec89e088ed8"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chair_4-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "19fd84d47a421dcc420b20f952309e86c462ef4fbe3bd5433d008631e5f0dc55"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_0-eah-512.json": {
+      "count": 500,
+      "sha256": "bcd62ae98c1056e00b420b7a4d280215fe016e1cae8c4411ebeaabbc766db93e"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_0-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "862c1d080cfef4e58c26f0bdc13a870a9f19612aac35fe50252ed7e3ac2b188e"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_1-eah-512.json": {
+      "count": 500,
+      "sha256": "301bc251f294721be7e15eef75dec444d8b2c978fd85df4614b2a64e52cf3d1c"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_1-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "0b282a5767791016aad761e6db22fb018bf1bd07be6fc103a3c315a75a5f7a2b"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_2-eah-512.json": {
+      "count": 500,
+      "sha256": "2fe3daa43ccc67c7bc9c3538501586577d7bc7b08b411a68252438d3dc4b1908"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_2-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "bda6e16b4dc3be54779095188aed174e63b1fb40690fb3bf83c722db881ebb22"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_3-eah-512.json": {
+      "count": 500,
+      "sha256": "aab6823530434af0f04bb952a9ab35c9592218e7958a34d7a9954094c764be9c"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_3-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "bc17b86ff895de80cef182b1397bae0d6e7955d5052e9f1c06e92059f64966c6"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_4-eah-512.json": {
+      "count": 500,
+      "sha256": "c85d635b3bd7a83a5f3c58f8e6d94420796b85ceba3db06eb000ec6dd47498bf"
+    },
+    "results/llava-v1.6-vicuna-7b-hf/chairmetrics_4-vhr-l1h14-512.json": {
+      "count": 500,
+      "sha256": "2c71cc6cae75660c7a92c57f7cc70878b3c53366c218f3b2523accce004d9cc8"
+    },
+    "rrscvhr_benchmark_results/cycle0/chair/rrscvhr/instructblip-vicuna-7b/0-chair_0-rrscvhr-h18-unified-bench-cycle0-512.json": {
+      "count": 10,
+      "sha256": "98d2b9c9f52726ecc423d44e9647b9dacaea7bd687ba27c49968c5feb8752d9c"
+    },
+    "rrscvhr_benchmark_results/cycle0/chair/scvhr/instructblip-vicuna-7b/0-chair_0-scvhr-h18-unified-bench-cycle0-512.json": {
+      "count": 10,
+      "sha256": "414b3e796fe1f7738af528091736ecf6bc87b08f4ae3ef8bf3ddb57d45278886"
+    },
+    "rrscvhr_benchmark_results/cycle0/chair/vhr/instructblip-vicuna-7b/0-chair_0-vhr-h18-unified-bench-cycle0-512.json": {
+      "count": 10,
+      "sha256": "76d354455893ce3815d56ce2d48e414f25dcf1b8643a2eb1e05182b5cfcc909f"
+    },
+    "rrscvhr_benchmark_results/cycle1/chair/rrscvhr/instructblip-vicuna-7b/0-chair_0-rrscvhr-h18-unified-bench-cycle1-512.json": {
+      "count": 10,
+      "sha256": "98d2b9c9f52726ecc423d44e9647b9dacaea7bd687ba27c49968c5feb8752d9c"
+    },
+    "rrscvhr_benchmark_results/cycle1/chair/scvhr/instructblip-vicuna-7b/0-chair_0-scvhr-h18-unified-bench-cycle1-512.json": {
+      "count": 10,
+      "sha256": "414b3e796fe1f7738af528091736ecf6bc87b08f4ae3ef8bf3ddb57d45278886"
+    },
+    "rrscvhr_benchmark_results/cycle1/chair/vhr/instructblip-vicuna-7b/0-chair_0-vhr-h18-unified-bench-cycle1-512.json": {
+      "count": 10,
+      "sha256": "76d354455893ce3815d56ce2d48e414f25dcf1b8643a2eb1e05182b5cfcc909f"
+    },
+    "rrscvhr_benchmark_results/warmup/chair/rrscvhr/instructblip-vicuna-7b/0-chair_0-rrscvhr-h18-unified-bench-warmup-chair-512.json": {
+      "count": 1,
+      "sha256": "0fec62a340eba4b4e5cca0b67a8306ce46696bc122a0f049957f88dec3b1bf52"
+    },
+    "rrscvhr_benchmark_results/warmup/chair/scvhr/instructblip-vicuna-7b/0-chair_0-scvhr-h18-unified-bench-warmup-chair-512.json": {
+      "count": 1,
+      "sha256": "9bd944aa77664a0f2877416132f441f2c86740445497217fdec54b3d03bdc7e4"
+    },
+    "rrscvhr_benchmark_results/warmup/chair/vhr/instructblip-vicuna-7b/0-chair_0-vhr-h18-unified-bench-warmup-chair-512.json": {
+      "count": 1,
+      "sha256": "969e36f44f7b5e99f05c61af4ec54a0b29cfb8030845e409c9bd266d52bc1f41"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chair_0-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "7f46321c428b7722de4296ba55b12aec4b2c319cd287a57758519b2f162a33b2"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chair_1-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "125ee53d8cb5285f1bb832d193512d4d46f93dfd6989f598f097b30ddfe46908"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chair_2-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "350ffc2c19d9da2cb6625b638d4b572a63f00b61967fb3d81beed4ab75c4477f"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chair_3-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "700ce2d2305aa31cb29c3abc493acad9f8ce4743a5df0972f56774b79af85b01"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chair_4-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "fcd3261a9495a46e92131d7f48551d686c6bb05b1b6d8bfa1350765ea6390221"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chairmetrics_0-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "b2a073d6ddc586acc1b64bd8d27eaee2d3be83acd498a8c13e22c41fde438057"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chairmetrics_1-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "c0eb6ea1ec0ad7c222fde9cb75b384c37a5e33793502a1bf4879b39616e8c653"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chairmetrics_2-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "04d3d0d65de0ee8f4f0f934d91326a21feb7542d112e4dc319cb614a47f53018"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chairmetrics_3-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "b4c8538539ed48b4331789c9ddb9ad122008f395fa88750273d91be7d5c85d8a"
+    },
+    "rrscvhr_official_results/instructblip-vicuna-7b/chairmetrics_4-rrscvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "5006c2453690378aaf98db20d6c9fc647b9f4502cf8db62d5e8bda83181d967d"
+    },
+    "rrscvhr_sameprocess_smoke_results/instructblip-vicuna-7b/0-chair_0-rrscvhr-h18-a05-b01-sameprocess-smoke-512.json": {
+      "count": 1,
+      "sha256": "a104d1e8cfc6939a5708b20565e01bb1e4aaf7f9b9384fac10c580e3c7661759"
+    },
+    "rrscvhr_sameprocess_smoke_results/instructblip-vicuna-7b/0-chair_0-scvhr-h18-rr-sameprocess-smoke-512.json": {
+      "count": 1,
+      "sha256": "30d09277f19ef29da12198a757f17f4085ce8ccd028e12c127884627f7a75b74"
+    },
+    "rrscvhr_smoke_results/instructblip-vicuna-7b/0-chair_0-rrscvhr-h18-a05-b01-smoke-512.json": {
+      "count": 1,
+      "sha256": "a104d1e8cfc6939a5708b20565e01bb1e4aaf7f9b9384fac10c580e3c7661759"
+    },
+    "scvhr_dev_results/instructblip-vicuna-7b/0-chair_0-scvhr-h18-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "bc2951cbc8665a46edd439135a7478398fa11d60933206b19bb65ffa407eb864"
+    },
+    "scvhr_official_results/instructblip-vicuna-7b/chair_0-scvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "eea52148fd063a9de6273df465518a8fad005d3b77ac7a6a341337fc61917212"
+    },
+    "scvhr_official_results/instructblip-vicuna-7b/chair_1-scvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "0ed55de6662da3096cb2ab879cdeeb9784b0d615d7813544bdb237683005cfbf"
+    },
+    "scvhr_official_results/instructblip-vicuna-7b/chair_2-scvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "1be812db109c16633cd9a949494b83978da9d9977bc8b90f78ca74a5041a842b"
+    },
+    "scvhr_official_results/instructblip-vicuna-7b/chair_3-scvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "bae50b80b5c8b98513a4cd9b533354fe7c9ed16210e6461510d7d90e39b99287"
+    },
+    "scvhr_official_results/instructblip-vicuna-7b/chair_4-scvhr-h18-a05-b01-official-512.json": {
+      "count": 500,
+      "sha256": "f21a9f06589f6db6825ec1d4691286bc403bc8a28d98c9efeb3b8c5443fd4577"
+    },
+    "scvhr_switch_diagnostic_results/llava-1.5-7b-hf/0-chair_0-scvhrdiag-unseen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "d937625e6dfaeeda1809311aad16ee43401e07cfa673d5ca89edc9cb2de0649d"
+    },
+    "scvhr_switch_diagnostic_smoke_results/llava-1.5-7b-hf/0-chair_0-scvhrdiag-unseen-a05-b01-512.json": {
+      "count": 1,
+      "sha256": "e9ef544cc9a00c87982d31e35e0f981a0453cff22433855e1179e973f15e883b"
+    },
+    "scvhr_validation_results/instructblip-vicuna-7b/0-chair_0-scvhr-val-h18-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "79fe5b180ba1685d8fb21741547802a2da295bb807a25fa261c5c8c02d606cb9"
+    },
+    "smoke_results/instructblip-vicuna-7b/0-chair_0-ccvhr-smoke-remove-h18-n500-512.json": {
+      "count": 1,
+      "sha256": "f528e7686fe6e7fae56335b588bb9be057daab79c2850c7d43abe650902f7b4f"
+    },
+    "smoke_results/instructblip-vicuna-7b/0-chair_0-csvhr-smoke-dir25-h18-128.json": {
+      "count": 1,
+      "sha256": "9a562aaa34601fa99ac9960b0ff1be335d842408ee9a4de43ee17fac3c5c8ed8"
+    },
+    "smoke_results/instructblip-vicuna-7b/0-chair_0-scvhr-smoke-h18-a05-b01-512.json": {
+      "count": 1,
+      "sha256": "9bd944aa77664a0f2877416132f441f2c86740445497217fdec54b3d03bdc7e4"
+    },
+    "smoke_results/instructblip-vicuna-7b/0-chair_0-vhrvcd-sym-smoke-h18-a05-512.json": {
+      "count": 1,
+      "sha256": "b2f09e78f7cf7d3834a8d0d20fa67772ee8366e84ef845fd16687a0cd7fe6460"
+    },
+    "validation2_results/instructblip-vicuna-7b/0-chair_0-dlvhr-val-linear50-h18-512.json": {
+      "count": 100,
+      "sha256": "8f8a09dea9adf980f6416d047d49dd1d0162b55a11c83db0bb7d1beb5199e12c"
+    },
+    "validation2_results/instructblip-vicuna-7b/0-chair_0-dsvhr-val-dir375-h18-512.json": {
+      "count": 100,
+      "sha256": "1ffd6efd87f39a92ce87d168348a3ff33172d56aeb0cfe7090469f9697e86dd8"
+    },
+    "validation_results/instructblip-vicuna-7b/0-chair_0-csvhr-val-dir50-h18-512-cycle3.json": {
+      "count": 100,
+      "sha256": "c295eec9b99315a8d432d9e43f1da2d06bfd95f1f6e3e88f887dc5a8dbe79c38"
+    },
+    "validation_results/instructblip-vicuna-7b/0-chair_0-csvhr-val-dir50-h18-512.json": {
+      "count": 100,
+      "sha256": "5a34fb4b3ec1f04bb5f79c98685e7c0e85d3d7f4c30f52a9da9de25c273c4dce"
+    },
+    "validation_results/instructblip-vicuna-7b/0-chair_0-vhr-val-h18-512-cycle3.json": {
+      "count": 100,
+      "sha256": "e64ae908697ff3bdd3280c5db407ba70b5a39f4a97fa380425d1caed23d662c1"
+    },
+    "validation_results/instructblip-vicuna-7b/0-chair_0-vhr-val-h18-512.json": {
+      "count": 100,
+      "sha256": "9fd939f04ba9643b227e4370d91224cdfa3bd1e39184f803e3898bd6b97f359a"
+    },
+    "vegscvhr_dev_results/llava-1.5-7b-hf/0-chair_0-vegscvhr-unseen-a05-b01-512.json": {
+      "count": 100,
+      "sha256": "d7f75124254ff4010f9afffd3a3136d52f13823a84d6e752c833cb86256cf844"
+    },
+    "vegscvhr_smoke512_results/llava-1.5-7b-hf/0-chair_0-vegscvhr-unseen-a05-b01-512.json": {
+      "count": 1,
+      "sha256": "6086323eab54905490436f2994e6028813ab211f490fe7216989ba42c070c0a7"
+    },
+    "vegscvhr_smoke_results/llava-1.5-7b-hf/0-chair_0-vegscvhr-unseen-a05-b01-64.json": {
+      "count": 1,
+      "sha256": "a744a873607b15ae02e7961a713cbfee4723d17a150ff0de99a8f8371d55c9f9"
+    },
+    "vhrvcd_dev_results/instructblip-vicuna-7b/0-chair_0-vhrvcd-sym-h18-a05-b01-n500-512.json": {
+      "count": 100,
+      "sha256": "c43ef1589ba5a7e4f4284ea92c4e3965f383d225ae698d52c9fa343720b89fa0"
+    }
+  },
+  "historical_unique_ids": 2852,
+  "available_unused_ids": 37652,
+  "splits": {
+    "dev": {
+      "path": "experiment/care_dev_chair_ids.json",
+      "count": 100,
+      "sha256": "86850d50b8a4d10a239d97ad48f1d39ab9694cedfbcd5b49daf9e3c1b83ae32e"
+    },
+    "validation": {
+      "path": "experiment/care_validation_chair_ids.json",
+      "count": 100,
+      "sha256": "e78a04a071e64d38e3128842e4fcdca380a67eb19cc52e3e042e6585080964d4"
+    },
+    "test": {
+      "path": "experiment/care_test_chair_ids.json",
+      "count": 500,
+      "sha256": "5031aede212e49881f5ff318e3a4dc7403f1e2e6afb7a115a1d9dfb7bb196ff6"
+    }
+  }
+}
