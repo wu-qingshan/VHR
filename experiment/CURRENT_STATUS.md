@@ -18,6 +18,14 @@ CHAIR 上 RR=SC、POPE 上 RR=VHR 均逐字段一致。RR 因此同时保留 30.
 
 下一主方向：**stability-aware token routing**。只在 SC 候选相对 VHR 引入重复 n-gram/连续循环风险时回退 VHR，避免此前全局 no-repeat 对正常描述的破坏。本次正式 CHAIR 只能用于发现问题，后续阈值和规则必须在新开发集上确定，并使用新的锁定验证集；不能回看正式结果调参。详细数字见 `experiment/RR-SC-VHR-EFFICIENCY-QUALITY.md`。
 
+## CARE-SC 新方法：部分正结果但预注册失败
+
+在排除历史2852个图像ID后，新建 CARE dev/validation/test=100/100/500。CARE 使用 VHR、base、text-only 三分支，只保留“内部干预方向与有图/无图视觉证据符号一致”的全词表修正，并为 binary 回退 VHR、为自对比独有 exact cycle 提供稳定性保护。
+
+LLaVA-1.5 新 dev 100图结果：VHR 32.0/10.39，标准 SC 32.0/9.43，CARE **30.0/7.68**。CARE 将 hallucinated mentions 66→45、unique correct objects 205→211，重复率也略降；但 CHAIRs 相对 VHR 仅-2，95% CI `[-11,7]`，McNemar `p=0.824`，未达到预注册的至少-8及显著性门槛。标准 SC 在该划分也未重现 CHAIRs 改善。CA 与 CARE 100/100完全一致，cycle guard 0次触发。三分支耗时约为 VHR 的2.53倍。
+
+因此 CARE 记为“质量/覆盖 Pareto 部分正、核心门槛失败”，不运行 locked validation、不扫描符号阈值或 alpha。下一方向停止 logits gate 变体，转向利用视觉敏感 head 定位图像区域并对高风险实体 token 进行局部主动验证。完整记录见 `experiment/CARE-SC-VHR.md`。
+
 ## 最新进展：SC-VHR 的 LLaVA-1.5 冻结迁移
 
 InstructBLIP 稳定结果与 POPE 负结果保持不变。冻结 SC-VHR 已在 LLaVA-1.5 的独立 dev/validation 各 100 图上完成：

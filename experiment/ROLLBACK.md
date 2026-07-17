@@ -88,3 +88,16 @@ RR-SC-VHR 统一效率、COCO caption quality、重复/循环诊断和可复现�
 ```bash
 git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-20260717
 ```
+
+## CARE-SC 检查点
+
+- `care-scvhr-preregistered-20260717`：CARE 公式、门槛、停止规则和全新100/100/500隔离划分；
+- `care-scvhr-implementation-ready-20260717`：反事实对齐、稳定性保护、runner、纯函数测试与成功烟雾验证；
+- `care-scvhr-dev-eval-ready-20260717`：结果生成前冻结的统一 dev evaluator；
+- `care-scvhr-dev-negative-20260717`：100图部分正但门槛失败的完整记录，locked validation 未运行。
+
+所有 `care_*_results/` 目录保持未跟踪。恢复 CARE 负结果检查点而不覆盖当前工作树：
+
+```bash
+git switch -c restore/care-dev-negative care-scvhr-dev-negative-20260717
+```

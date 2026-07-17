@@ -3,7 +3,7 @@
 > 开始日期：2026-07-17
 > 分支：`research/care-scvhr`
 > 起始检查点：`7e1434c`（tag: `rrscvhr-efficiency-quality-20260717`）
-> 状态：方法、隔离划分和实现均已完成；纯函数测试、开放描述烟雾与 binary 回退等价验证通过，尚未运行100图 dev。
+> 状态：100图 dev 已完成。CARE 获得较好的 CHAIRi、对象覆盖和重复 Pareto 点，但 CHAIRs 改善不足且不显著，未通过预注册门槛；locked validation 与 reserved test 不运行，不扫描参数。
 
 ## 1. 研究动机
 
@@ -181,3 +181,56 @@ VEG、PD、DG 已有冻结负结果，不在新划分上重复调参。正式论
 - 2026-07-17：用旧 VEG runner 重新生成同一图的 VHR/SC 控制输出，`question_id/text/gt/ans_conf/question` 与 CARE runner 逐字段一致，证明新 flags 未污染标准路径。
 - 2026-07-17：POPE popular 前10题 binary smoke 中，CARE 与 VHR 10/10 的 ID、文本、标签、confidence、问题逐字段一致；route 全为 `vhr`，没有建立 CARE 诊断字段。
 - 2026-07-17：新增冻结 dev evaluator `scripts/evaluate_care_dev.py`，在结果完成后一次性计算 CHAIR、对象覆盖、distinct、重复、cycle、配对 bootstrap/McNemar 和全部预注册 gate；输出拒绝覆盖，避免手工选择统计口径。
+- 2026-07-17：四方法在4张独立 GPU 上完成 CARE dev 100图。生成时间：VHR 389秒、SC 734秒、CA 982秒、CARE 986秒；结果均为100行且输出目录独立。
+- 2026-07-17：冻结 evaluator 首次误用默认 Python，因缺少 NLTK `punkt_tab` 在创建分析文件前退出；随后使用正式 `vhr` 环境原样重跑成功，未修改脚本、门槛或结果。
+
+## 11. CARE dev 结果
+
+| 方法 | CHAIRs ↓ | CHAIRi ↓ | Len | mentions | hallucinated | unique correct | repeated-3 ↓ | repeated-4 ↓ | cycles |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| VHR | 32.0 | 10.39 | 79.75 | 635 | 66 | 205 | 0.01498 | 0.00592 | 0 |
+| SC | 32.0 | 9.43 | 77.68 | 583 | 55 | 208 | 0.01666 | 0.00650 | 0 |
+| CA-SC | **30.0** | **7.68** | 76.27 | 586 | **45** | **211** | **0.01476** | **0.00587** | 0 |
+| CARE-SC | **30.0** | **7.68** | 76.27 | 586 | **45** | **211** | **0.01476** | **0.00587** | 0 |
+
+### 11.1 配对统计
+
+CARE 相对 VHR：
+
+- CHAIRs：-2.0，bootstrap 95% CI `[-11, 7]`，修复/新增=11/9，McNemar `p=0.824`；
+- CHAIRi：-2.72，95% CI `[-6.03, 0.38]`；
+- Len：-3.48词，95% CI `[-6.16,-0.85]`，相对变化 -4.36%；
+- hallucinated mentions：66→45，下降31.82%；
+- unique correct objects：205→211，保留率102.93%；
+- repeated 3/4-gram 均略低于 VHR。
+
+CARE 相对标准 SC：
+
+- CHAIRs：-2.0，95% CI `[-10,6]`，修复/新增=10/8，McNemar `p=0.815`；
+- CHAIRi：-1.75，95% CI `[-4.44,0.77]`；
+- unique correct objects：208→211；
+- repeated 3/4-gram 均改善。
+
+标准 SC 在该固定新 dev 上没有重现历史 CHAIRs 优势：VHR 与 SC 均为32.0，修复/新增=10/10，McNemar `p=1.0`。因此本划分不能支持“CARE 在稳定 SC 收益上进一步提升”的强结论，但按预注册不更换 ID。
+
+### 11.2 机制诊断
+
+- 平均每图 plausible tokens 319.78，其中47.61%通过符号对齐；
+- 对齐 token 中71.20%为负向对齐，说明保留“图像也不支持”的负 delta 仍是主要修正来源；
+- 保留 intervention absolute delta 的47.08%；
+- CA 与 CARE 100/100 文本及全部指标完全一致；
+- stability guard 0次触发，因为该100图中CA和VHR均没有形成预定义 exact cycle。
+
+## 12. 门槛判定
+
+相对 VHR：CHAIRi、coverage、长度和cycle门槛通过；CHAIRs 至少下降8点及其CI门槛失败。
+
+相对 SC：全部 Pareto 描述性门槛通过，但核心结果不显著，且 SC 自身未在新划分重现 CHAIRs 改善。
+
+总判定：**失败，不进入 locked validation**。不扫描 `alpha/beta`、符号阈值或软mask；不运行 `experiment/care_validation_chair_ids.json` 和 reserved test。
+
+## 13. 方法评价与下一方向
+
+全词表符号对齐比候选级 VEG 更合理：它在点估计上同时降低 CHAIRs/CHAIRi、减少31.8%幻觉 mentions，并增加 unique correct objects。但收益规模和显著性不足以缩小与最新方法的差距，三分支成本又达到 VHR 的约2.53倍。
+
+这说明纯 logits 级反事实仍缺少“对象在图像哪个区域被支持”的定位证据。下一方向停止词表 delta/gate 变体，转向 **head-guided active visual verification**：利用视觉敏感 head 定位与候选实体相关的图像区域，只在高风险实体 token 上进行局部重看和验证。该方向需要在新的方法划分上重新预注册，不能使用 CARE locked validation 调整。
