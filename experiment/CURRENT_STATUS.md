@@ -37,6 +37,11 @@ SRR dev 也已完成并停止：它把 SC exact cycle 从 233/300 降至 0、长
 validation/test 仍未运行。结论转为：稳定性回退是必要安全组件，但主生成轨迹必须从
 vanilla 出发，再做对象级视觉证据验证，不能默认沿VHR/SC生成到出现退化才回退。
 
+当前主线为 OER（Object-Evidence Revision）可行性：先在已打开 dev 的 vanilla 对象
+提及上测 Qwen 自身 Yes/No logit 是否能区分真实与幻觉对象。只有固定 verifier 达到
+AUC、balanced accuracy 和 score-gap 门槛，才实现通用 noun-phrase 提取与最小 caption
+修订；协议见 `experiment/QWEN-OBJECT-EVIDENCE.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

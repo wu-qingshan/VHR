@@ -138,3 +138,7 @@ forward、base cache 连续与重复运行等价性全部通过后的标签为
 SRR 300图 dev、完整 CHAIR/coverage/cycle/runtime/bootstrap 分析与停止结论标签为
 `qwen-srr-dev-negative-20260717`。SRR 消除全部 exact cycle 并改善 SC 的效率/覆盖，
 但没有恢复到 vanilla Pareto；locked validation/test 未运行，结果目录保持 untracked。
+
+Qwen 对象 Yes/No logit verifier 的固定 prompt、token ids、全300图 query 构造和可行性
+门槛预注册标签为 `qwen-object-evidence-preregistered-20260717`。该标签不含 verifier
+实现或结果。
