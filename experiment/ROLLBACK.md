@@ -88,3 +88,7 @@ RR-SC-VHR 统一效率、COCO caption quality、重复/循环诊断和可复现�
 ```bash
 git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-20260717
 ```
+
+## CIRD-VHR teacher gate检查点
+
+CIRD的token级因果残差蒸馏设计、整段DPO可行性否决、COCO train 100图teacher-forcing gate和固定ID检查点为 `cird-teacher-preregistered-20260717`。该标签不包含训练依赖、teacher输出、LoRA权重或效果实验。
