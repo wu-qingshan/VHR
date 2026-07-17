@@ -3,7 +3,7 @@
 > 日期：2026-07-17
 > 分支：`research/qwen-vera`
 > 起点：`qwen-sear-dev-negative-20260717`
-> 当前状态：方法、数据边界和停止门槛预注册；尚未创建新划分、实现或运行模型
+> 当前状态：方法与300/500/500新划分已冻结；尚未实现或运行VERA模型效果
 
 ## 1. 研究动机
 
@@ -136,3 +136,18 @@ AMBER/MMHal/HallusionBench、POPE、MME/MMBench和近期强基线。
 
 - 2026-07-17：从`qwen-sear-dev-negative-20260717`创建独立分支；冻结上述方法、数据
   排除、工程门槛和dev停止规则。此时尚未创建新split、实现或运行VERA。
+- 2026-07-17：划分脚本扫描7个历史ID文件和321个`*_results` JSON，排除4446个已使用
+  或已保留COCO ID，剩余36058。固定seed `2026071701`创建300/500/500集合，三者互斥，
+  且与原Qwen dev/validation/test完全无重叠。尚未生成任何新集合caption。
+
+新split manifest内的canonical JSON digest：
+
+- dev：`fe4df8aaf564aae0dd79e7a4b62885063d5720f971aca5c4440b0d3c6859c595`
+- validation：`b8f8b27026e4553b464bde4080823bfa7edb70f045d0a32b4d0f3c209728ef85`
+- test：`99bf437b501dbfa3370aa98a388bd95200e60614914b68a929ca59658632a230`
+
+实际split文件SHA256分别为：
+
+- dev：`fa4234988eccb3588ee0b3e27e9005f6ce4507a6e2c16dea55fc380696a63ddf`
+- validation：`d8e892cf1036ebfea84c1efb6f264599b3016e1341de018c949ccbd4aa053636`
+- test：`bc13b91dde4757d82d7aa63627fef941cebc86eedaa3d49f382ec0c3157d410a`

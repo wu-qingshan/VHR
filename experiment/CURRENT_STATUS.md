@@ -54,6 +54,11 @@ CHAIRs由23.67显著降至17.00，CI为`[-9.67,-4.00]`，但unique correct objec
 未使用dev上做phrase/clause级局部修订，并保持vanilla主轨迹。详见
 `experiment/QWEN-SEAR.md`。
 
+当前候选为VERA-VHR：vanilla生成主轨迹，只有冻结verifier发现`score<=0.1`对象时才对
+局部句子生成base与VHR两个修订候选；候选必须通过二次视觉验证并保留全部高置信
+protected object roots，否则逐字回退原句。已创建排除4446个历史/保留ID的全新
+300/500/500划分，原Qwen locked集合继续封存。协议见`experiment/QWEN-VERA-VHR.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

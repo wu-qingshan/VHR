@@ -163,3 +163,7 @@ objects仅保留91.53%，因此否决整句删除并转向新的phrase/clause级
 VERA-VHR 的vanilla安全锚点、证据触发局部修订、base/VHR双候选、protected-root二次
 验证、全新数据隔离和严格dev停止规则的预注册标签为
 `qwen-vera-preregistered-20260717`。该标签不含新split、实现或VERA结果。
+
+排除4446个历史/保留ID后的VERA 300/500/500互斥划分标签为
+`qwen-vera-dev-split-20260717`。该标签包含split与完整manifest；三个新集合均尚未运行，
+并与原Qwen dev/validation/test完全无重叠。
