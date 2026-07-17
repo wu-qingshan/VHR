@@ -47,6 +47,10 @@ balanced accuracy 0.795，正负 mean score gap 0.587、95% CI `[0.513,0.658]`�
 目前现代 Qwen 上最可靠的机制信号。下一步实现通用 noun-phrase + 最小证据修订，但
 不能用0.5阈值机械删除整句，因为仍有45个真实对象被判No。
 
+当前效果候选为 SEAR：用通用 spaCy noun chunks 提取对象，只删除包含
+`verifier score<=0.1`高置信不存在对象的句子，其余 vanilla 文本逐字保留。先过通用
+提取 recall/candidate-count gate，再运行效果；协议见 `experiment/QWEN-SEAR.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：
