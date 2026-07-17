@@ -3,6 +3,17 @@
 > 更新时间：2026-07-17
 > 详细全过程见 `experiment/CS-VHR.md`；原项目诊断见 `EXPERIMENT_DIAGNOSIS.md`。
 
+## 当前执行阶段：Qwen2.5-VL 现代主干迁移
+
+当前论文短板已经从“是否存在正信号”转为现代主干、评测广度和方法 Pareto 不足。
+因此停止继续扫描 InstructBLIP/LLaVA 的手工 gate，从稳定标签
+`rrscvhr-efficiency-quality-20260717` 建立独立分支 `research/qwen-scvhr`。
+
+本阶段先在隔离 `.venv-qwen/` 中审计 Qwen2.5-VL-7B-Instruct 的 GQA、3D RoPE、
+动态 image token 和 cache，再实现 Qwen 专用 VHR/SC。工程等价性全部通过前不创建
+效果划分；dev 未过预注册门槛时不运行 locked validation，也不扫描参数。完整协议见
+`experiment/QWEN-SC-VHR.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

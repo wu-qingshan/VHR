@@ -88,3 +88,18 @@ RR-SC-VHR 统一效率、COCO caption quality、重复/循环诊断和可复现�
 ```bash
 git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-20260717
 ```
+
+## Qwen2.5-VL 迁移预注册检查点
+
+- 分支：`research/qwen-scvhr`
+- 起点：`rrscvhr-efficiency-quality-20260717`
+- 内容：独立环境版本、Qwen 特有工程等价性门槛、全新数据隔离方案、dev 停止规则。
+- `.venv-qwen/`、模型权重和 `qwen_*_results/` 均被忽略，不进入提交。
+- 该阶段没有携带 CIRD/SAVER/VCRP 后续分支代码，也没有运行 validation/test。
+- 预注册 tag：`qwen-scvhr-preregistered-20260717`。
+
+恢复时应从该 tag 新建分支，不能升级历史环境：
+
+```bash
+git switch -c restore/qwen-scvhr-preregistered qwen-scvhr-preregistered-20260717
+```
