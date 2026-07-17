@@ -1,0 +1,138 @@
+# VERA-VHR：视觉证据路由的局部修订
+
+> 日期：2026-07-17
+> 分支：`research/qwen-vera`
+> 起点：`qwen-sear-dev-negative-20260717`
+> 当前状态：方法、数据边界和停止门槛预注册；尚未创建新划分、实现或运行模型
+
+## 1. 研究动机
+
+现有Qwen证据形成三个互补结论：
+
+1. 原生vanilla为23.67/6.46，而VHR/SC为29.67/8.26与27.00/7.93，说明现代主干上
+   全局head amplification会破坏已较强的base轨迹；
+2. 固定对象verifier在617 queries上达到ROC-AUC 0.926，说明具体对象存在性具有可靠
+   的独立视觉信号；
+3. SEAR把CHAIRs显著降到17.00，但整句删除只保留91.53% unique correct objects。
+   311个删除句移除28次幻觉mention的同时移除243次真实mention，证明失败来自修订粒度，
+   而不是对象证据完全无效。
+
+VERA-VHR（Verified Evidence-Routed Amendment with VHR）不沿VHR轨迹生成整段caption，
+而把VHR降为**只在证据触发后提供局部修订候选**。vanilla始终是主轨迹和安全锚点。
+
+## 2. 固定方法
+
+### 2.1 源caption与触发
+
+1. 使用Qwen2.5-VL-7B-Instruct原生vanilla生成完整caption；
+2. 使用SEAR已冻结的`spaCy 3.8.11 + en_core_web_sm 3.8.0`、determiner规则和stoplist
+   提取noun chunks；
+3. 使用完全冻结的Yes/No verifier prompt、token ids和score；
+4. 一个句子只在任一候选`score<=0.1`时触发局部修订；同句所有低分phrase一次性列入，
+   不逐phrase多轮修改。
+
+### 2.2 固定修订prompt
+
+对触发句使用原图和如下固定模板：
+
+```text
+Original sentence: {sentence}
+The following phrases are not clearly supported by the image: {phrases}.
+Rewrite only this sentence using details clearly visible in the image. Preserve every other
+supported object and fact, do not add new objects, and do not mention the unsupported phrases.
+Answer with exactly one revised sentence and no explanation.
+```
+
+每个触发句生成两个greedy候选：
+
+- `base-revision`：原生Qwen，不安装VHR干预；
+- `vhr-revision`：原VHR固定Qwen适配，layer 1 + last 14、top 50%、ratio=2、原filter。
+
+两者均保留模型原生`repetition_penalty=1.05`，`max_new_tokens=128`。不使用SC，不扫描
+prompt、层数、ratio、温度或候选数。
+
+### 2.3 修订候选验证与接受
+
+对两个候选再次运行同一通用noun-chunk提取和冻结verifier。原句中`score>=0.5`的root
+lemma定义为protected roots。候选必须同时满足：
+
+1. parser得到且只得到一个非空句子；
+2. 不含`score<=0.1`的候选对象；
+3. 保留全部protected roots，按root lemma精确匹配；
+4. 不再包含任一触发phrase的root lemma；
+5. word length为原句的`[0.5,1.25]`；
+6. 不含period≤16、连续≥3的exact whitespace cycle。
+
+通过候选按固定词典序选择：
+
+1. protected roots保留数（理论上全部通过者相同）；
+2. 候选最低object score更高；
+3. 与原句word-level Levenshtein edit distance更小；
+4. 完全并列时优先base-revision。
+
+若两个候选均失败，逐字保留原句。每个源句最多修订一次，不递归重写、不做整句删除、
+不使用CHAIR词表或标注参与触发、生成、接受或排序。
+
+## 3. 数据隔离
+
+从完整COCO val2014重新创建300/500/500 dev/locked validation/locked test，必须排除：
+
+- 所有`experiment/**/*ids.json`，包括现有Qwen dev/validation/test；
+- 所有历史与当前`*_results/**/*.json`中出现的COCO ID；
+- Qwen smoke IDs 42与136；
+- 三个新集合彼此重叠。
+
+固定seed为`2026071701`。输出命名为`qwen_vera_{dev,validation,test}_chair_ids.json`及
+`qwen_vera_split_manifest.json`。locked validation/test在方法代码、工程smoke和dev gate
+提交tag之前禁止生成caption、query或verifier结果。
+
+## 4. 工程门槛
+
+1. VERA关闭修订时与封存vanilla输出逐字段一致；
+2. base-revision使用原生分支，VHR关闭/ratio=1时首步logits与base误差为0；
+3. 同一修订query重复两次token序列和score完全一致；
+4. base→VHR、VHR→base顺序不改变各自fresh结果；
+5. 原caption未触发的句子逐字保留；
+6. 接受候选满足全部六项规则，fallback逐字等于原句；
+7. 输出非空、确定性，所有query/候选/接受决策有可追溯manifest；
+8. 不修改历史`main.py/generation.py/vhr.py`和任何历史结果文件。
+
+任一工程门槛失败时只修复实现问题，不运行效果数据。
+
+## 5. 新dev效果门槛
+
+固定比较vanilla、原VHR、SC-VHR、SEAR-style sentence deletion诊断、base-only revision、
+VHR-only revision与完整VERA-VHR。SEAR只作为失败粒度消融，不参与参数选择。
+
+完整VERA-VHR必须同时满足：
+
+1. CHAIRs相对vanilla至少下降3.0点；
+2. CHAIRi不高于vanilla；
+3. unique correct objects至少保留vanilla的98%；
+4. Len为vanilla的`[0.90,1.05]`；
+5. exact cycle和512 source hit不高于vanilla；
+6. paired bootstrap CHAIRs差值方向为负，95% CI上界不大于0；
+7. 总pipeline平均时延低于同图SC-VHR；
+8. 触发句中至少20%接受一个修订候选，避免结果等同vanilla；
+9. 报告base/VHR候选生成数、各自通过/被选择率、fallback率、protected-root保持、
+   新增/移除正确与幻觉对象、修订前后grammar与失败案例。
+
+任一门槛失败：停止，不运行locked validation，不扫描0.1/0.5、prompt、长度、候选排序或
+VHR配置。全部通过后冻结实现并提交tag，才允许一次性运行locked validation 500图。
+
+## 6. 论文贡献假设
+
+若成功，VERA-VHR支持三项比单一CHAIR增益更完整的贡献：
+
+1. 系统证明视觉head amplification从旧Q-Former/projector架构迁移到现代GQA/mRoPE
+   主干时可能产生负迁移；
+2. 将VHR从全局解码干预重构为证据触发的局部proposal，避免破坏base主轨迹；
+3. 用显式protected-root与二次视觉验证形成可审计的hallucination/coverage Pareto。
+
+即使Qwen dev通过，论文目标仍需InstructBLIP、LLaVA和至少一个独立现代架构迁移，以及
+AMBER/MMHal/HallusionBench、POPE、MME/MMBench和近期强基线。
+
+## 7. 实验日志
+
+- 2026-07-17：从`qwen-sear-dev-negative-20260717`创建独立分支；冻结上述方法、数据
+  排除、工程门槛和dev停止规则。此时尚未创建新split、实现或运行VERA。

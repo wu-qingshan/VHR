@@ -159,3 +159,7 @@ SEAR extraction工程、5750-query verifier、300图dev负结果与严格停止�
 `qwen-sear-dev-negative-20260717`。结果目录`qwen_sear_dev_results/`保持untracked；
 locked Qwen validation/test从未读取。核心结果为CHAIRs 23.67→17.00，但unique correct
 objects仅保留91.53%，因此否决整句删除并转向新的phrase/clause级方法。
+
+VERA-VHR 的vanilla安全锚点、证据触发局部修订、base/VHR双候选、protected-root二次
+验证、全新数据隔离和严格dev停止规则的预注册标签为
+`qwen-vera-preregistered-20260717`。该标签不含新split、实现或VERA结果。
