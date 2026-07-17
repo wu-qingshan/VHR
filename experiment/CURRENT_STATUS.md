@@ -31,6 +31,12 @@ cycle 增加 15.33pp。locked validation/test 未运行。结论是固定 VHR he
 必须在同一 dev 上恢复到接近 vanilla 的幻觉、覆盖和稳定性 Pareto，才允许进入尚未
 查看的 locked validation。协议见 `experiment/SRR-SC-VHR.md`。
 
+SRR dev 也已完成并停止：它把 SC exact cycle 从 233/300 降至 0、长度从345.63降至
+223.26、unique correct 从482恢复到512、时延从25.29降至14.78秒，但 CHAIRs 仍为
+27.00，未接近 vanilla 23.67，且严格 coverage/长度/max-hit 门槛失败。locked
+validation/test 仍未运行。结论转为：稳定性回退是必要安全组件，但主生成轨迹必须从
+vanilla 出发，再做对象级视觉证据验证，不能默认沿VHR/SC生成到出现退化才回退。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

@@ -100,3 +100,54 @@ tag，才允许在未查看的 Qwen locked validation 500 图运行一次。
 
 工程固定 tag：`qwen-srr-engineering-ready-20260717`。下一步只生成 SRR 300 图，
 所有 vanilla/VHR/SC baseline 均复用封存结果。
+
+## 7. SRR dev 300 图结果
+
+六个 chunk 全部 exit 0，SRR 恰好覆盖 300 个冻结 ID，无重复、无缺失。合并输出
+SHA256 为 `b7133c2d5b060c72db109843b9630734ea471cb4d6065bfe8109b93c59fde71e`，
+分析 SHA256 为 `7acbe9a10bf2a071fb37f2bca3a1b0d7d6af21576962095234938326d498ed52`；
+`qwen_srr_dev_results/` 保持 untracked。
+
+| 方法 | CHAIRs ↓ | CHAIRi ↓ | Len | unique correct | exact cycle | 512 hit | 秒/图 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| vanilla | **23.67** | **6.46** | **147.48** | **531** | 50 | **29** | **5.88** |
+| VHR | 29.67 | 8.26 | 315.60 | 515 | 187 | 133 | 11.77 |
+| SC | 27.00 | 7.93 | 345.63 | 482 | 233 | 166 | 25.29 |
+| SRR | 27.00 | 7.15 | 223.26 | 512 | **0** | 55 | 14.78 |
+
+SRR 的机制作用成立：
+
+- 235/300（78.33%）触发 rollback，平均 step 126.73；
+- exact cycle 从 SC 233/300 降为 **0/300**；
+- 平均每个 rollback 样本少运行 148.46 次 VHR forward；
+- 共屏蔽 720 个会完成 cycle 的 base 候选；
+- 相对 SC，CHAIRi、长度、coverage、max hit 和时延全部改善；
+- 相对 VHR，CHAIRs 仍只改善 2.67 点，95% CI `[-8.33,3.00]`，不显著。
+
+预注册 gate 结果：
+
+| gate | SRR | 判定 |
+|---|---:|---|
+| CHAIRs ≤24.67 | 27.00 | 失败 |
+| 相对 VHR CHAIRs 至少 -5 | -2.67 | 失败 |
+| CHAIRi ≤6.96 | 7.15 | 失败 |
+| unique correct ≥98% vanilla | 512/531=96.42% | 失败 |
+| Len 为 vanilla 0.90–1.25× | 1.514× | 失败 |
+| cycle ≤vanilla+2pp | 0% | 通过 |
+| max hit ≤vanilla+5pp | 55，阈值44 | 失败 |
+| latency < SC | 14.78<25.29 | 通过 |
+| rollback 样本 VHR forward严格少于base | 223/235 | 失败（12图触发后立即EOS） |
+| paired CHAIRs 方向优于VHR | -2.67 | 通过 |
+
+12 个非严格小于样本全部满足 `VHR forward = rollback_step+1` 且触发后立即生成 EOS；
+没有样本在 rollback 后继续运行 VHR，工程语义正确。但预注册要求为“严格少于”，因此
+仍按失败计，不事后修改 gate。
+
+总判定：**失败，停止在 dev，不运行 locked validation，不扫描 cycle 规则。**
+
+SRR 证明“base cache + 可观测退化时不可逆回退”能彻底修复 cycle，并大幅恢复效率与
+覆盖；但它触发得太晚，SC 在 rollback 前已经引入对象错误和冗长前缀，因此无法超过
+强 vanilla。下一主方法不能再以 VHR/SC 为默认生成轨迹，应从 vanilla 出发，只对
+候选对象做独立视觉证据验证。
+
+本阶段负结果 tag：`qwen-srr-dev-negative-20260717`。

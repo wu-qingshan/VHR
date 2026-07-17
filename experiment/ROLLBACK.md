@@ -134,3 +134,7 @@ SRR CPU cycle/safe-token 单元测试、无风险 SRR=SC、真实 cycle rollback
 forward、base cache 连续与重复运行等价性全部通过后的标签为
 `qwen-srr-engineering-ready-20260717`。工程结果保持在未跟踪
 `qwen_srr_smoke_results/`。
+
+SRR 300图 dev、完整 CHAIR/coverage/cycle/runtime/bootstrap 分析与停止结论标签为
+`qwen-srr-dev-negative-20260717`。SRR 消除全部 exact cycle 并改善 SC 的效率/覆盖，
+但没有恢复到 vanilla Pareto；locked validation/test 未运行，结果目录保持 untracked。
