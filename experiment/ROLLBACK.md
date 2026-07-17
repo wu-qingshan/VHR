@@ -61,3 +61,5 @@ git switch -c restore/pdscvhr-preregistered pdscvhr-preregistered-20260717
 PD 新 dev 负结果完成后的检查点使用标签 `pdscvhr-dev-negative-20260717`。该标签保留实现与完整记录，但生成结果仍未跟踪；若继续新方法，应从该标签创建新分支，不修改历史输出。
 
 三套 LLaVA pooled 分析与通用多配对脚本的检查点标签为 `scvhr-llava-pooled-20260717`。
+
+DG-SC-VHR 预注册实现与成功烟雾测试的检查点标签为 `dgscvhr-preregistered-20260717`；生成结果保持未跟踪。

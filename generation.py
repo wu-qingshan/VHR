@@ -31,6 +31,14 @@ def compute_contrasted_logits(primary_logits, contrast_logits, alpha, positive_d
     return primary_logits + alpha * delta
 
 
+def apply_disagreement_gate(primary_logits, contrast_logits, contrasted_logits):
+    """Use contrasted logits only for batch items whose branch argmax differs."""
+    disagreement = primary_logits.argmax(dim=-1, keepdim=True) != contrast_logits.argmax(
+        dim=-1, keepdim=True
+    )
+    return torch.where(disagreement, contrasted_logits, primary_logits), disagreement
+
+
 def _vhr_decoding(
     self,
     input_ids: torch.LongTensor,
@@ -94,11 +102,17 @@ def _vhr_decoding(
     images_cd = generation_config.images_cd
     use_vcd = images_cd is not None
     use_base_contrast = generation_config.vhr_base_contrast
+    use_disagreement_gate = generation_config.vhr_disagreement_gate
     use_aux_contrast = use_vcd or use_base_contrast
     if use_vcd and use_base_contrast:
         raise ValueError("Choose either noisy-image VCD or VHR self-contrast, not both")
     if use_vcd and score_mode == "consensus":
         raise ValueError("Full VCD is not supported with the abandoned CC-VHR consensus score")
+    if use_disagreement_gate and not use_base_contrast:
+        raise ValueError("Disagreement gating requires VHR self-contrast")
+
+    disagreement_total_steps = 0
+    disagreement_contrast_steps = 0
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -231,6 +245,14 @@ def _vhr_decoding(
                 ),
             )
             contrasted_logits = contrasted_logits.masked_fill(next_token_logits < cutoff, -float("inf"))
+            if use_disagreement_gate:
+                contrasted_logits, disagreement = apply_disagreement_gate(
+                    next_token_logits,
+                    next_token_logits_cd,
+                    contrasted_logits,
+                )
+                disagreement_total_steps += disagreement.numel()
+                disagreement_contrast_steps += int(disagreement.sum().item())
             next_token_scores = logits_processor(input_ids, contrasted_logits)
         else:
             next_token_scores = logits_processor(input_ids, next_token_logits)
@@ -294,6 +316,13 @@ def _vhr_decoding(
 
     if streamer is not None:
         streamer.end()
+
+    if use_disagreement_gate:
+        self._last_vhr_routing_stats = {
+            "contrast_steps": disagreement_contrast_steps,
+            "total_steps": disagreement_total_steps,
+            "contrast_rate": disagreement_contrast_steps / max(1, disagreement_total_steps),
+        }
 
     if return_dict_in_generate:
         if self.config.is_encoder_decoder:
@@ -1886,6 +1915,7 @@ def generation_config_init(self, **kwargs):
     self.vhr_images_noisy = kwargs.pop("vhr_images_noisy", None)
     self.vhr_base_contrast = kwargs.pop("vhr_base_contrast", False)
     self.vhr_positive_delta_contrast = kwargs.pop("vhr_positive_delta_contrast", False)
+    self.vhr_disagreement_gate = kwargs.pop("vhr_disagreement_gate", False)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters

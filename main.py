@@ -159,6 +159,7 @@ class HallucinationTest:
                     {
                         "vhr_base_contrast": True,
                         "vhr_positive_delta_contrast": "pdscvhr" in self.method,
+                        "vhr_disagreement_gate": "dgscvhr" in self.method,
                         "vhr_logit_alpha": self.vhr_logit_alpha,
                         "vhr_logit_beta": self.vhr_logit_beta,
                     }
@@ -295,7 +296,16 @@ class HallucinationTest:
             ans_conf = probs.topk(1)[0].cpu().numpy()[0]
             ans_conf = str(ans_conf*100)[:5]
 
-            output_file.write(json.dumps({"question_id": qid, "text": gen_answer, "gt": gt, "ans_conf": ans_conf, "question": qu})+"\n")
+            result_row = {
+                "question_id": qid,
+                "text": gen_answer,
+                "gt": gt,
+                "ans_conf": ans_conf,
+                "question": qu,
+            }
+            if "dgscvhr" in self.method:
+                result_row["routing_stats"] = dict(self.model._last_vhr_routing_stats)
+            output_file.write(json.dumps(result_row) + "\n")
 
         output_file.close()
         end = datetime.datetime.now()
