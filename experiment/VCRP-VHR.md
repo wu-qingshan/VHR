@@ -3,7 +3,7 @@
 > 开始日期：2026-07-17  
 > 分支：`research/vpb-vhr`  
 > 起始检查点：`7e1434c`（tag: `rrscvhr-efficiency-quality-20260717`）  
-> 状态：机制假设与诊断gate预注册；尚未实现干预或运行效果实验
+> 状态：100图无干预机制诊断已完成；主信号未通过AUC和bootstrap gate，VCRP效果实验停止，validation未运行
 
 ## 1. 来自既有实验的新机制约束
 
@@ -116,3 +116,27 @@ VCRP的论文价值不只取决于最低CHAIR：它必须证明单分支、低�
 - 2026-07-17：3项纯函数测试通过：对齐FFN不变、反向分量被最小删除、零视觉残差安全。默认flag关闭。
 - 2026-07-17：PD dev首图同一模型加载依次运行标准VHR与无干预诊断VHR，question ID、text、confidence完全一致。诊断共83个token，每步15个目标层，全部统计finite、zero-visual layer fraction为0。
 - 2026-07-17：首图分析器完成token decode、Treebank word span、CHAIR synonym/node-word和diagnostic step对齐，无对齐失败。该图只有1个CHAIR对象mention，不能用于gate判定；完整100图尚未运行。
+- 2026-07-17：使用6个GPU分片在PD dev 100图上同进程依次运行标准VHR与诊断VHR。两者100/100的ID、text、confidence完全一致；诊断共10396个token步骤，每步15层，全部finite，zero-visual layer fraction最大值为0。
+- 2026-07-17：CHAIR对象mention对齐得到618项，其中幻觉68、真实550，无对齐失败。主信号 `opposing_ffn_fraction` 的幻觉/真实中位数为`0.02039/0.01899`，差值`0.00140`，但ROC-AUC仅`0.5646`，图像级bootstrap中位数差95% CI为`[-0.00052,0.00346]`。
+
+## 9. 机制gate正式判定
+
+| 门槛 | 结果 | 判定 |
+|---|---:|---|
+| 幻觉mention ≥50 | 68 | 通过 |
+| 真实mention ≥100 | 550 | 通过 |
+| 幻觉中位数更高 | +0.00140 | 通过 |
+| bootstrap CI下界 >0 | -0.00052 | **失败** |
+| ROC-AUC ≥0.65 | 0.5646 | **失败** |
+| 至少3个位置四分位同方向 | 3/4 | 通过 |
+| 输出等价且无对齐失败 | 100/100、0失败 | 通过 |
+
+辅助信号同样不足：
+
+- `conflict_layer_fraction` AUC `0.5728`；
+- `projection_hidden_fraction` AUC `0.5901`；
+- `visual_ffn_norm_ratio` AUC `0.4262`，方向反而更像“幻觉时视觉残差更弱”，但未预注册为主信号。
+
+**总判定：失败。** FFN与VHR视觉残差的对抗有弱点估计信号，并在后3个位置四分位方向一致，但不能可靠区分幻觉和真实对象。按第5节停止规则，不运行 `pdscvhr_validation_chair_ids.json`，不启用VCRP intervention，不组合多个弱指标，不扫描层、倍率或阈值。
+
+该结果进一步说明，仅靠单个手工内部标量构造training-free gate的上限较低。下一阶段应让模型从大量自动标注的近反事实VHR/SC响应对中学习，而不是继续人工组合logit、attention或residual分数。

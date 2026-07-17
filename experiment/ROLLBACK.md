@@ -98,3 +98,5 @@ git switch -c restore/vcrp-preregistered vcrp-mechanism-preregistered-20260717
 ```
 
 VCRP无干预诊断实现、纯函数测试、1图同进程等价烟雾和token/CHAIR对齐分析器检查点为 `vcrp-diagnostic-ready-20260717`。该标签没有运行100图机制gate，也没有启用VCRP intervention。诊断结果目录 `vcrp_smoke_results/` 与 `vcrp_diagnostic_results/` 保持未跟踪。
+
+VCRP 100图机制gate否决检查点为 `vcrp-mechanism-negative-20260717`。该标签记录100/100输出等价、618个对象mention、AUC/CI失败和正式停止判定；不包含任何VCRP效果输出，`pdscvhr_validation_chair_ids.json`仍未运行。

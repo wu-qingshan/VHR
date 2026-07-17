@@ -3,6 +3,12 @@
 > 更新时间：2026-07-17
 > 详细全过程见 `experiment/CS-VHR.md`；原项目诊断见 `EXPERIMENT_DIAGNOSIS.md`。
 
+## 最新结论：VCRP隐藏通路冲突信号未通过机制gate
+
+在SAVER空间grounding失败后，VCRP把VHR-selected head干预残差投影到hidden space，并测量同层FFN的反向分量，尝试用单分支、无参数的闭式半空间投影替代SC双分支。PD dev 100图的无干预诊断与标准VHR在ID/text/confidence上100/100一致，共对齐618个CHAIR对象mention（68幻觉、550真实）。主信号幻觉中位数略高，但AUC仅0.5646，bootstrap差值CI `[-0.00052,0.00346]`跨0，未通过预注册0.65和显著性门槛。
+
+因此不启用VCRP效果路径，不运行封存validation，不组合弱信号或扫描阈值。连续多条手工training-free gate路线的失败表明，下一阶段需要转向由大量自动标注近反事实响应对学习的轻量偏好蒸馏，而不是继续构造单个内部标量。完整记录见 `experiment/VCRP-VHR.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：
