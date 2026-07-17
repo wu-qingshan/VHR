@@ -181,3 +181,15 @@ Qwen 上单一 CHAIR 正结果不足以声称达到论文目标。
 
 工程门槛完成后的固定 tag 为 `qwen-scvhr-engineering-ready-20260717`。下一步只生成
 预注册的新互斥 dev/locked validation/test 划分，尚不允许运行 validation/test。
+
+- 2026-07-17：工程 tag 后按 seed `20260717` 生成固定划分。完整 COCO val2014
+  共有 40,504 图；扫描 249 个历史结果 JSON 和所有已提交 ID 文件，并显式排除
+  Qwen smoke 图 42/136，共排除 3,146 个曾使用 ID，剩余候选 37,358。
+  dev/validation/test 为 300/500/500，互相无重叠、与 exclusion 无重叠、图像零缺失。
+  SHA256 分别为 `6013156430c7a05195646bdf10512b7aced15e710efd762b016d0f75930290ef`、
+  `594ff74fd6ca2ca95773d7b2dcb98eb35e04eada8c4249e41f35c69286e4e58b`、
+  `964d83e70d0532fafa435ebee994039e30de56933c841befce5c0cbec7eeb7a0`。
+  完整 exclusion 来源见 `experiment/qwen_chair_split_manifest.json`。
+
+固定划分 tag 为 `qwen-scvhr-dev-split-20260717`。从此只允许在 dev 上做预注册的
+一次信号验证；validation/test 保持 locked。

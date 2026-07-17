@@ -112,3 +112,7 @@ ratio=1/HF generate/A->B/RR 等价性全部通过后的检查点标签为
 ```bash
 git switch -c restore/qwen-scvhr-engineering qwen-scvhr-engineering-ready-20260717
 ```
+
+排除 3,146 个历史/机制/smoke COCO id 后的 Qwen 300/500/500 互斥划分标签为
+`qwen-scvhr-dev-split-20260717`。完整 exclusion manifest 与三个 split SHA256 均在
+该标签中；该标签尚未运行任何 Qwen 效果样本。
