@@ -57,3 +57,5 @@ git switch -c restore/scvhr-llava15 scvhr-llava15-crossval-20260716
 ```bash
 git switch -c restore/pdscvhr-preregistered pdscvhr-preregistered-20260717
 ```
+
+PD 新 dev 负结果完成后的检查点使用标签 `pdscvhr-dev-negative-20260717`。该标签保留实现与完整记录，但生成结果仍未跟踪；若继续新方法，应从该标签创建新分支，不修改历史输出。

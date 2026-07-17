@@ -14,6 +14,8 @@ InstructBLIP 稳定结果与 POPE 负结果保持不变。冻结 SC-VHR 已在 L
 
 CHAIRs/CHAIRi 两套均显著改善且长度稳定，但 total generated mentions 均低于预注册 93% 下限，因此不进入 LLaVA 正式五种子，也不扫描参数。事后规范化对象诊断显示唯一正确对象仍保留 96.6%/95.3%，而幻觉 mentions 降低 27.1%/46.3%；应表述为“跨架构幻觉降低成立，但 coverage-preserving 结论未过预注册 gate”。完整记录见 `experiment/SC-VHR-LLAVA15.md`。
 
+2026-07-17 进一步在完全未使用的新 100 图上比较 VHR、标准 SC 和 Positive-Delta SC。标准 SC 再次显著改善：39.0/11.45 → **28.0/8.86**，CHAIRs 95% CI `[-19,-3]`；unique correct objects 保留 **98.66%**。只保留正 delta 的 PD-SC 恢复 total mentions 到 94.86%，但 CHAIRs/CHAIRi 为 39.0/11.46，和 VHR 无差异，因此否决且不运行锁定 validation。机制结论是：对 base 偏好 token 的负向外推是 SC 的核心有效成分；total mentions 下降主要混合了重复减少，不能直接等价为语义覆盖下降。完整记录见 `experiment/PD-SC-VHR.md`。
+
 ## 已放弃的第一候选：DC-VHR
 
 暂定名称：Direction-Calibrated VHR（DC-VHR）。
