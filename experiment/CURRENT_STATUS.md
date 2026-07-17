@@ -24,6 +24,8 @@ Disagreement-Gated SC-VHR 只在 VHR/base argmax 不一致时使用 contrast。�
 
 VEG-SC-VHR 保留在线 text-only 第三分支，并只允许视觉支持不低于 VHR top 的标准 SC switch。新 dev 结果为 33.0/9.53/79.85，mentions 保留 93.98%、unique correct 保留 98.21%，处于 VHR 39.0/11.45 与标准 SC 28.0/8.86 之间；但 CHAIRs 未达到预注册 ≤31，paired CI `[-14,2]` 跨 0，且比标准 SC 慢 21.5%。视觉 support margin 对修复有信号，却不能区分新增幻觉，因此不扫描 margin、不运行 validation。下一方向转为 response-type routing 解决 POPE 回归。
 
+Response-Routed SC-VHR 已完成。POPE 9000/9000 binary 覆盖、CHAIR 非 binary；同进程严格等价和完整 11,500 行物化审计均通过。RR CHAIR 保持标准 SC 的 30.40/8.42，POPE 精确恢复 VHR 的 Acc/F1/YesRate 85.91/85.47/46.55，同时 binary 推理关闭第二分支、成本约减半。当前建议论文实用主方案为 RR-SC-VHR，创新核心仍是 SC，routing 作为任务依赖 calibration 组件；纯 SC POPE 负结果必须保留。
+
 ## 已放弃的第一候选：DC-VHR
 
 暂定名称：Direction-Calibrated VHR（DC-VHR）。

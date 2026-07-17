@@ -53,6 +53,7 @@ def argument_parser():
     parser.add_argument("--chair_seeds", default="0,1,2,3,4", type=str, help="comma-separated CHAIR seeds")
     parser.add_argument("--chair_samples", default=500, type=int, help="number of randomly sampled CHAIR images")
     parser.add_argument("--chair_ids_file", default=None, type=str, help="optional JSON file containing fixed COCO image ids")
+    parser.add_argument("--dataset_limit", default=None, type=int, help="optional per-dataset limit for smoke tests")
     return parser
 
 
@@ -93,6 +94,7 @@ class HallucinationTest:
         self.vhr_logit_alpha = args.vhr_logit_alpha
         self.vhr_logit_beta = args.vhr_logit_beta
         self.chair_samples = args.chair_samples
+        self.dataset_limit = getattr(args, "dataset_limit", None)
         self.chair_ids = None
         if args.chair_ids_file is not None:
             with open(args.chair_ids_file, "r") as f:
@@ -175,11 +177,16 @@ class HallucinationTest:
                 }
             )
 
-        chunk_size = ceil(len(dataset.all) / self.num_chunks)
+        dataset_qids = dataset.all
+        if self.dataset_limit is not None:
+            if self.dataset_limit <= 0:
+                raise ValueError(f"dataset_limit must be positive, got {self.dataset_limit}")
+            dataset_qids = dataset_qids[: self.dataset_limit]
+        chunk_size = ceil(len(dataset_qids) / self.num_chunks)
         output_file = open(output_file_path, "w")
 
         start = datetime.datetime.now()
-        for qid in tqdm(dataset.all[self.chunk_idx*chunk_size:(self.chunk_idx+1)*chunk_size], ncols=100, desc=f"Seed {seed} Chunk {self.chunk_idx} Inference"):
+        for qid in tqdm(dataset_qids[self.chunk_idx*chunk_size:(self.chunk_idx+1)*chunk_size], ncols=100, desc=f"Seed {seed} Chunk {self.chunk_idx} Inference"):
 
             # prepare for inputs
             img, qu, gt = dataset[qid]
@@ -194,6 +201,10 @@ class HallucinationTest:
                     generate_kwargs["vhr_score_mode"] = "magnitude"
                     generate_kwargs["vhr_head_fraction"] = 0.5
                     generate_kwargs["vhr_positive_only"] = False
+            response_route = None
+            if "rrscvhr" in self.method:
+                response_route = "vhr" if is_binary_question(qu) else "scvhr"
+                generate_kwargs["vhr_base_contrast"] = response_route == "scvhr"
             prompt = self.template.format(question=qu)
             inputs = self.processor(text=prompt, images=img, return_tensors="pt")
             inputs = {key: value.to(self.device) for key, value in inputs.items()}
@@ -313,6 +324,8 @@ class HallucinationTest:
                 result_row["visual_evidence_stats"] = dict(
                     self.model._last_vhr_visual_evidence_stats
                 )
+            if response_route is not None:
+                result_row["response_route"] = response_route
             output_file.write(json.dumps(result_row) + "\n")
 
         output_file.close()

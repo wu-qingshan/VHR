@@ -113,3 +113,14 @@ SC-VHR 的 precision 增加 0.72，但 recall 下降 2.69，yes rate 下降 1.92
 5. 与一般 contrastive/self-contrast decoding 的关系需要在论文中清晰区分，并补 VCD、M3ID/ICD 类基线讨论。
 
 因此 SC-VHR 应保留为论文主候选，但不能把实验阶段视为完全结束。InstructBLIP 核心阶段已结束；投稿前至少还需 LLaVA 跨模型、质量与效率评测。若采用“开放式问题用 SC-VHR、二元问题回退 VHR”的通用响应形式路由，POPE 可理论上恢复原 VHR，但必须作为明确的方法组件和消融，而不能隐藏当前纯 SC-VHR 的负结果。
+
+## 8. Response-Routed SC-VHR 更新（2026-07-17）
+
+上述响应形式路由已正式实现和验证。POPE 三分割共 9000 题全部以 `Is` 开头，binary classifier 覆盖 100%；CHAIR 固定描述提示不触发 binary。开放描述显式启用 SC，binary 显式关闭 `vhr_base_contrast` 并完整回退 VHR。
+
+- RR CHAIR 五种子与纯 SC 完全一致：30.40/8.42/112.77；
+- RR POPE 与原 VHR 完全一致：Acc/F1/YesRate 85.91/85.47/46.55；
+- 同进程严格 smoke 验证 ID/text/confidence：CHAIR 1/1、POPE 30/30 全部一致；
+- 完整 11,500 行 RR 输出由权威 SC-CHAIR 与 VHR-POPE 分支确定性物化并逐行审计。
+
+因此通用方法建议改为 RR-SC-VHR，但论文必须同时报告纯 SC POPE F1 84.34 的负结果，说明 routing 是为解决任务依赖决策阈值而引入的显式组件。详细记录见 `experiment/RR-SC-VHR.md`。
