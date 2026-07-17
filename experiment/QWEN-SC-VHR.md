@@ -205,3 +205,62 @@ Qwen 上单一 CHAIR 正结果不足以声称达到论文目标。
 
 完整 dev runner 冻结 tag 为 `qwen-scvhr-dev-runner-ready-20260717`。下一步只运行
 这一个固定配置；若 dev 任一预注册门槛失败，立即停止，不运行 locked validation。
+
+## 12. Qwen dev 300 图正式结果
+
+六个 50 图 chunk 均正常退出，vanilla/VHR/SC 各恰好 300 个冻结 ID，无重复、无缺失，
+RR 开放描述由已验证的 RR=SC 等价性物化。结果目录 `qwen_dev_results/` 保持 untracked。
+合并输出 SHA256 为 vanilla
+`f51a8f862f702dce713c19baa47f538fd256c562ae28ed1a3a3ef3d1c764cf7b`、VHR
+`26f4cecb3278584648fabee326fc56480e5a75abfe65146ea87953a11abf6b40`、SC
+`148ebc5b25592bdf5bffde2476152dd66d524efd017042b97083bc3e4e00837f`；完整分析为
+`e3db7d5f2a903cb6cee2173e6b079550ad86226f15146407f8a7e80450a975e2`。
+
+| 方法 | CHAIRs ↓ | CHAIRi ↓ | Len | hallucinated/generated mentions |
+|---|---:|---:|---:|---:|
+| vanilla | **23.67** | **6.46** | **147.48** | 106 / 1641 |
+| VHR | 29.67 | 8.26 | 315.60 | 240 / 2906 |
+| SC/RR | 27.00 | 7.93 | 345.63 | 220 / 2774 |
+
+SC 相对 VHR：
+
+- CHAIRs `-2.67`，未达到预注册 `-3.0`；paired bootstrap 95% CI
+  `[-8.33, 3.00]`，`P(delta<0)=0.8108`；
+- CHAIRi `-0.328`，95% CI `[-6.23,4.25]`；
+- Len `+30.04`，相对增加 **9.52%**，95% CI `[10.52,49.68]`；
+- total unique correct objects `515 -> 482`，只保留 **93.59%**，损失 6.41%；
+- exact cycle `187/300 -> 233/300`，增加 15.33pp；配对为 VHR-only 33、
+  SC-only 79、both 154，McNemar exact `p=1.64e-5`；
+- 512-token 上限命中 `133 -> 166`，正常 termination rate `55.67% -> 44.67%`；
+- 秒/图均值 vanilla/VHR/SC 为 `5.88/11.77/25.29`，SC 约为 vanilla 的 4.30 倍。
+
+预注册 gate：
+
+| gate | 结果 | 判定 |
+|---|---:|---|
+| CHAIRs 至少下降 3 点 | -2.67 | 失败 |
+| CHAIRi 不恶化 | -0.328 | 通过 |
+| unique correct 损失不超过 2% | -6.41% | 失败 |
+| 长度变化在 ±5% | +9.52% | 失败 |
+| cycle 增加不超过 1pp | +15.33pp | 失败 |
+| paired bootstrap 方向为负 | 0.8108 | 通过 |
+| RR binary 精确回退 VHR | 工程等价通过 | 通过 |
+
+总判定：**失败，停止在 dev，不运行 locked validation/test。**
+
+该负结果比“SC 没超过 VHR”更重要：现代 Qwen vanilla 本身为
+`23.67/6.46/147.48`，显著优于 VHR 的 `29.67/8.26/315.60` 和 SC 的
+`27.00/7.93/345.63`。VHR 将 max-length hit 从 29/300 增至 133/300、cycle 从
+50/300 增至 187/300，说明固定放大 layer 1 + last 14 的 top-half heads 在 Qwen 的
+GQA/现代对齐主干上会破坏语言稳定性；SC 又沿该不稳定方向外推，无法从根本上修复。
+
+因此不扫描 Qwen 的层数、倍率、head fraction 或 alpha/beta。下一方法必须满足：
+
+1. 把 vanilla/base 视为安全锚点，而不是只在 VHR 与 SC 之间选择；
+2. 在检测到候选将形成已固定定义的 exact cycle 时永久回退 base cache；
+3. 回退后停止 VHR 分支 forward，改善稳定性和实际计算；
+4. 保留 RR binary 路由；
+5. 使用同一 dev 作为方法开发集，但固定规则后只在未查看的 locked validation 判断，
+   不扫描 cycle period/repeat 次数（沿用此前已冻结的 period≤16、连续≥3次定义）。
+
+本阶段负结果 tag：`qwen-scvhr-dev-negative-20260717`。

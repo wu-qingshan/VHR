@@ -14,10 +14,17 @@
 效果划分；dev 未过预注册门槛时不运行 locked validation，也不扫描参数。完整协议见
 `experiment/QWEN-SC-VHR.md`。
 
-当前 E0/E1/E2 已全部通过：固定 revision 完整下载；原生动态 image token、确定性和
+E0/E1/E2 已全部通过：固定 revision 完整下载；原生动态 image token、确定性和
 EOS 正常；关闭 patch 首步 logits 误差为 0；独立循环与 HF generate 一致；ratio=1、
-A->B 状态清理、GQA query-head 选头、SC 双 cache 和 RR 路由等价性均通过。尚未创建
-Qwen 效果划分、尚未运行 CHAIR/POPE。下一步为互斥划分与 dev 信号验证。
+A->B 状态清理、GQA query-head 选头、SC 双 cache 和 RR 路由等价性均通过。随后创建
+互斥 300/500/500 划分并只运行 dev；locked validation/test 始终未读取。
+
+Qwen 互斥 dev 300 图现已完成且失败：vanilla/VHR/SC 的 CHAIRs/CHAIRi/Len 为
+`23.67/6.46/147.48`、`29.67/8.26/315.60`、`27.00/7.93/345.63`。SC 相对 VHR
+CHAIRs 只改善 2.67 点且 CI 跨 0，同时 unique correct 损失 6.41%、长度增加 9.52%、
+cycle 增加 15.33pp。locked validation/test 未运行。结论是固定 VHR head amplification
+在现代 Qwen 上产生架构级负迁移，下一方向必须以 vanilla/base 为安全锚点做不可逆
+稳定性回退，而不是继续扫描 VHR 参数。
 
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 

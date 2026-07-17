@@ -120,3 +120,8 @@ git switch -c restore/qwen-scvhr-engineering qwen-scvhr-engineering-ready-202607
 Qwen 固定 CHAIR chunk runner、严格 merger 和完整 512-token 单图 smoke 后的标签为
 `qwen-scvhr-dev-runner-ready-20260717`。从该标签运行 dev，不允许再修改层数、倍率、
 alpha/beta、repetition penalty 或最大长度。
+
+Qwen 300 图 dev 的完整负结果、coverage/cycle/runtime/bootstrap 分析和停止决定标签为
+`qwen-scvhr-dev-negative-20260717`。locked validation/test 未运行，所有
+`qwen_dev_results/` 保持 untracked。该标签是后续 base-anchored stability rollback
+方法的机制起点，不应从结果目录复制或修改历史输出。
