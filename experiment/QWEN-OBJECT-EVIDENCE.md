@@ -3,7 +3,7 @@
 > 日期：2026-07-17
 > 分支：`research/qwen-object-evidence`
 > 起点：`qwen-srr-dev-negative-20260717`
-> 当前状态：对象验证信号可行性预注册；尚未运行 verifier
+> 当前状态：query构造与 verifier 工程门槛通过；尚未运行617-query feasibility
 
 ## 1. 为什么必须离开 VHR 默认轨迹
 
@@ -100,3 +100,12 @@ OER 输出目录运行 dev；locked validation 仍保持未查看。
 
 - 2026-07-17：从 SRR dev negative tag 创建独立分支，冻结 query、token id、score、
   样本范围和停止门槛；尚未运行 verifier。
+- 2026-07-17：从 vanilla 300 图构造 617 个同图去重对象 query，真实531、幻觉86，
+  覆盖281图；数量门槛通过。query 文件保持在未跟踪
+  `qwen_object_evidence_results/queries.json`。
+- 2026-07-17：工程 smoke 通过。dog/elephant/giraffe score 分别为
+  `0.9820/0.000031/0.99945`；dog 与 giraffe 重复 score 误差为0；动态 grid 为
+  `1x34x46` 与 `1x26x36`；正例首 token top1 为 Yes，负例 top1 为 No。
+
+工程 tag：`qwen-object-verifier-engineering-ready-20260717`。下一步只运行预注册的
+617-query feasibility，不生成或修改 caption。

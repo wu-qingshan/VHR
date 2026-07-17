@@ -142,3 +142,7 @@ SRR 300图 dev、完整 CHAIR/coverage/cycle/runtime/bootstrap 分析与停止�
 Qwen 对象 Yes/No logit verifier 的固定 prompt、token ids、全300图 query 构造和可行性
 门槛预注册标签为 `qwen-object-evidence-preregistered-20260717`。该标签不含 verifier
 实现或结果。
+
+617-query 构造、dog/elephant/giraffe 方向、重复确定性和动态 image-grid 状态清理通过
+后的标签为 `qwen-object-verifier-engineering-ready-20260717`。query/smoke 结果保持
+在未跟踪 `qwen_object_evidence_results/`。
