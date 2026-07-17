@@ -3,7 +3,7 @@
 > 日期：2026-07-17
 > 分支：`research/qwen-vera`
 > 起点：`qwen-sear-dev-negative-20260717`
-> 当前状态：方法与300/500/500新划分已冻结；尚未实现或运行VERA模型效果
+> 当前状态：实现与旧开放数据工程smoke通过；新300图dev尚未运行
 
 ## 1. 研究动机
 
@@ -157,3 +157,23 @@ AMBER/MMHal/HallusionBench、POPE、MME/MMBench和近期强基线。
   noun root，导致无意义低分触发；此时新VERA dev尚未运行。旧开放数据316个初始任务中
   12个含非ASCII词汇root。加入上述通用input-validity规则并形成v2预注册；不依据CHAIR
   错误、效果指标或locked数据修改，原v1 tag保留审计。
+- 2026-07-17：v2首个有效任务上base-revision连续生成128个`The`。同输入HF generate
+  正常输出，逐步诊断定位到SRR提交`28e8198`的回归：为了rollback后停止VHR cache，
+  `update_vhr`条件遗漏了vanilla mode，令当前独立vanilla循环重复使用prefill logits。
+  封存Qwen vanilla dev结果生成于该回归之前，SRR走独立base cache，因此历史效果结论
+  不受影响。恢复vanilla primary cache更新后必须重新通过HF逐token等价门槛。
+- 2026-07-17：恢复`qwen_scvhr.py`的vanilla primary cache逐token更新。同一修订输入上
+  HF generate与独立base循环均生成12个完全相同token；ratio=1 VHR也与HF完全一致。
+  base/vhr各自重复运行以及base→VHR、VHR→base顺序均逐token一致。
+- 2026-07-17：在旧开放Qwen dev构造v2任务，仅用于工程验证。合法性过滤后为306个触发
+  句/172图；固定前10个任务生成20个base/VHR候选、84个二次verifier query。完整VERA
+  接受3/10：base 2、VHR 1，其余7个逐字fallback；base-only接受2，VHR-only接受1。
+  接受和fallback路径、protected-root、trigger-root、length、cycle和score审计均物化。
+  新VERA dev/validation/test仍未运行。
+
+工程结果SHA256：
+
+- HF/ratio/order smoke：`1cf4e2c7ed285574bf150fa2b16f54250179288c83fc6f43c931c5c9baf59916`
+- 10-task revisions：`93af08fd7993e0e6087f778fa9a14da944aab217ee6e5b091514570f73b9e8f8`
+- candidate verifier：`8d876a0c8c4d2708629de8f5ea91c7e7e6388db0c8aefbe050a33b1dfe7e3eea`
+- VERA smoke outputs：`4699246c45cab3a78b6f71f3047097318b47e13103e0650d43ba799b5e279615`

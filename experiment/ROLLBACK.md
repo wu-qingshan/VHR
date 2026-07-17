@@ -171,3 +171,8 @@ VERA-VHR 的vanilla安全锚点、证据触发局部修订、base/VHR双候选�
 旧dev工程smoke发现Markdown `*`被spaCy误识别为noun root后、在任何新VERA dev运行前，
 加入“root与phrase必须含ASCII英文字母”的通用输入合法性规则。修订预注册标签为
 `qwen-vera-preregistered-v2-20260717`；v1 tag保留且不得用于效果主张。
+
+VERA核心策略、任务/双候选/二次query/严格物化脚本、vanilla cache回归修复、HF/ratio=1/
+顺序/重复等价性和10-task接受/fallback完整链路通过后的标签为
+`qwen-vera-engineering-ready-20260717`。所有smoke结果保持untracked；新VERA dev与两个
+locked集合尚未运行。

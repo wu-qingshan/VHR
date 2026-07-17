@@ -57,7 +57,9 @@ CHAIRs由23.67显著降至17.00，CI为`[-9.67,-4.00]`，但unique correct objec
 当前候选为VERA-VHR：vanilla生成主轨迹，只有冻结verifier发现`score<=0.1`对象时才对
 局部句子生成base与VHR两个修订候选；候选必须通过二次视觉验证并保留全部高置信
 protected object roots，否则逐字回退原句。已创建排除4446个历史/保留ID的全新
-300/500/500划分，原Qwen locked集合继续封存。协议见`experiment/QWEN-VERA-VHR.md`。
+300/500/500划分，原Qwen locked集合继续封存。旧开放数据工程smoke已通过：HF/base与
+ratio=1逐token等价，顺序/重复确定；前10个触发句完整链路接受3个（base 2、VHR 1）。
+新dev尚未运行。协议见`experiment/QWEN-VERA-VHR.md`。
 
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 

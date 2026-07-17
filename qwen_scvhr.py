@@ -330,8 +330,10 @@ def generate_qwen(
                 [attention_mask, torch.ones_like(token, dtype=attention_mask.dtype)],
                 dim=1,
             )
-            update_vhr = mode in {"vhr", "scvhr"} or (mode == "srrscvhr" and not rollback_active)
-            if update_vhr:
+            update_primary = mode in {"vanilla", "vhr", "scvhr"} or (
+                mode == "srrscvhr" and not rollback_active
+            )
+            if update_primary:
                 phase = "decode" if mode in {"vhr", "scvhr", "srrscvhr"} else "vanilla"
                 logits_vhr, cache_vhr = _decode_branch(
                     model,
