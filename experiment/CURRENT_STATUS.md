@@ -3,6 +3,12 @@
 > 更新时间：2026-07-17
 > 详细全过程见 `experiment/CS-VHR.md`；原项目诊断见 `EXPERIMENT_DIAGNOSIS.md`。
 
+## 最新结论：CIRD真实prefix蒸馏teacher不成立
+
+在手工内部gate连续失败后，CIRD尝试沿COCO真实caption prefix蒸馏base/VHR/SC的token分布。固定COCO-train 100图共1459 token，SC的原plausibility cutoff屏蔽507个真实token（34.75%），其中对象token24/153（15.69%）；对象数量也未达到预注册200。未屏蔽子集上的NLL改善有明显选择偏差，不能证明teacher有效。
+
+因此不安装训练依赖、不训练LoRA、不扫描beta或取消mask。下一优先级从继续方法变体转为RR-SC的Qwen2.5-VL现代backbone迁移与AMBER/MMHal/HallusionBench/MME等证据扩展。完整记录见 `experiment/CIRD-VHR.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

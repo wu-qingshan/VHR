@@ -53,6 +53,33 @@ def apply_visual_evidence_gate(primary_logits, base_logits, text_logits, contras
     return routed_logits, proposed_switch, allowed_switch, support_margin
 
 
+def summarize_teacher_target_logits(base_logits, vhr_logits, teacher_logits, target_id):
+    """Summarize one forced target under base, VHR, and SC distributions."""
+    target_id = int(target_id)
+
+    def nll(logits):
+        target = logits[0, target_id]
+        value = -(target - torch.logsumexp(logits[0], dim=-1))
+        return float(value.item()) if torch.isfinite(value) else None
+
+    base_target = base_logits[0, target_id]
+    vhr_target = vhr_logits[0, target_id]
+    teacher_target = teacher_logits[0, target_id]
+    return {
+        "target_id": target_id,
+        "base_nll": nll(base_logits),
+        "vhr_nll": nll(vhr_logits),
+        "sc_nll": nll(teacher_logits),
+        "sc_target_plausible": bool(torch.isfinite(teacher_target).item()),
+        "vhr_minus_base_target_logit": float((vhr_target - base_target).item()),
+        "sc_minus_vhr_target_logit": (
+            float((teacher_target - vhr_target).item())
+            if torch.isfinite(teacher_target)
+            else None
+        ),
+    }
+
+
 def _vhr_decoding(
     self,
     input_ids: torch.LongTensor,
@@ -119,6 +146,8 @@ def _vhr_decoding(
     use_disagreement_gate = generation_config.vhr_disagreement_gate
     use_switch_diagnostics = generation_config.vhr_switch_diagnostics
     use_visual_evidence_gate = generation_config.vhr_visual_evidence_gate
+    use_teacher_diagnostic = generation_config.vhr_teacher_diagnostic
+    forced_token_ids = generation_config.vhr_forced_token_ids
     use_aux_contrast = use_vcd or use_base_contrast
     if use_vcd and use_base_contrast:
         raise ValueError("Choose either noisy-image VCD or VHR self-contrast, not both")
@@ -132,6 +161,12 @@ def _vhr_decoding(
         raise ValueError("Visual-evidence gating requires VHR self-contrast")
     if use_visual_evidence_gate and (use_disagreement_gate or generation_config.vhr_positive_delta_contrast):
         raise ValueError("Visual-evidence gating cannot be combined with DG or positive-delta contrast")
+    if use_teacher_diagnostic and not use_base_contrast:
+        raise ValueError("CIRD teacher diagnostics require VHR self-contrast")
+    if use_teacher_diagnostic and not forced_token_ids:
+        raise ValueError("CIRD teacher diagnostics require non-empty forced token IDs")
+    if use_teacher_diagnostic and do_sample:
+        raise ValueError("CIRD teacher diagnostics require greedy generation")
 
     disagreement_total_steps = 0
     disagreement_contrast_steps = 0
@@ -150,6 +185,7 @@ def _vhr_decoding(
     visual_blocked_switch_steps = 0
     visual_allowed_margin_sum = 0.0
     visual_blocked_margin_sum = 0.0
+    teacher_token_stats = []
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -167,6 +203,8 @@ def _vhr_decoding(
 
     # keep track of which sequences are already finished
     batch_size, cur_len = input_ids.shape
+    if use_teacher_diagnostic and batch_size != 1:
+        raise ValueError("CIRD teacher diagnostics currently require batch size 1")
     prompt_length = cur_len
     this_peer_finished = False
     unfinished_sequences = torch.ones(batch_size, dtype=torch.long, device=input_ids.device)
@@ -335,6 +373,18 @@ def _vhr_decoding(
                 visual_blocked_margin_sum += float(
                     (support_margin * blocked_switch.float()).sum().item()
                 )
+            if use_teacher_diagnostic:
+                forced_index = cur_len - prompt_length
+                if forced_index >= len(forced_token_ids):
+                    raise RuntimeError("CIRD forced-token sequence ended before generation stopped")
+                teacher_step = summarize_teacher_target_logits(
+                    next_token_logits_cd,
+                    next_token_logits,
+                    contrasted_logits,
+                    forced_token_ids[forced_index],
+                )
+                teacher_step["step_index"] = forced_index
+                teacher_token_stats.append(teacher_step)
             next_token_scores = logits_processor(input_ids, contrasted_logits)
         else:
             next_token_scores = logits_processor(input_ids, next_token_logits)
@@ -360,7 +410,14 @@ def _vhr_decoding(
                 )
         
         # token selection
-        if do_sample:
+        if use_teacher_diagnostic:
+            forced_index = cur_len - prompt_length
+            next_tokens = torch.tensor(
+                [int(forced_token_ids[forced_index])],
+                dtype=input_ids.dtype,
+                device=input_ids.device,
+            )
+        elif do_sample:
             probs = nn.functional.softmax(next_token_scores, dim=-1)
             next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
         else:  # argmax
@@ -473,6 +530,14 @@ def _vhr_decoding(
             / max(1, visual_allowed_switch_steps),
             "blocked_support_margin_mean": visual_blocked_margin_sum
             / max(1, visual_blocked_switch_steps),
+        }
+    if use_teacher_diagnostic:
+        self._last_cird_teacher_stats = {
+            "token_count": len(teacher_token_stats),
+            "all_targets_plausible": all(
+                item["sc_target_plausible"] for item in teacher_token_stats
+            ),
+            "tokens": teacher_token_stats,
         }
 
     if return_dict_in_generate:
@@ -2069,6 +2134,8 @@ def generation_config_init(self, **kwargs):
     self.vhr_disagreement_gate = kwargs.pop("vhr_disagreement_gate", False)
     self.vhr_switch_diagnostics = kwargs.pop("vhr_switch_diagnostics", False)
     self.vhr_visual_evidence_gate = kwargs.pop("vhr_visual_evidence_gate", False)
+    self.vhr_teacher_diagnostic = kwargs.pop("vhr_teacher_diagnostic", False)
+    self.vhr_forced_token_ids = kwargs.pop("vhr_forced_token_ids", None)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters

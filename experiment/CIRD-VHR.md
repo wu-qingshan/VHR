@@ -3,7 +3,7 @@
 > 开始日期：2026-07-17  
 > 分支：`research/cid-vhr`  
 > 起始检查点：`7e1434c`（tag: `rrscvhr-efficiency-quality-20260717`）  
-> 状态：训练前teacher-forcing可行性gate预注册；尚未安装训练依赖、训练模型或运行效果实验
+> 状态：COCO-train 100图teacher-forcing gate已完成并失败；未安装训练依赖、未训练模型、未运行效果实验
 
 ## 1. 为什么从手工gate转向学习
 
@@ -99,3 +99,32 @@ binary存在性样本使用RR规则，以VHR而不是SC作为teacher，避免已
 - 训练依赖在gate通过前不安装；
 - 恢复起点：`rrscvhr-efficiency-quality-20260717`。
 
+## 8. 执行日志与正式判定
+
+- 2026-07-17：官方train2014整包下载速度预计超过80分钟，因此停止整包传输；改用可复现脚本从官方地址只下载固定100张图，共17MB。中止的部分zip已删除。
+- 2026-07-17：实现独立forced-token teacher diagnostic。每一步在同一真实caption prefix下记录base/VHR/SC目标NLL、VHR-base target delta和SC plausibility；生成token被强制为固定caption，不产生自由生成效果结果。
+- 2026-07-17：首图11个token中有8个被SC `beta=0.1` plausibility cutoff屏蔽，暴露SC自由生成分布可能不适合作为真实caption路径教师；未据此修改beta或取消cutoff。
+- 2026-07-17：6 GPU完成固定100图，共1459 token、153个CHAIR object token，无caption/token对齐失败。
+
+正式结果：
+
+- SC不可用目标：507/1459（34.75%）；
+- SC不可用对象目标：24/153（15.69%）；
+- 对象token数153，低于预注册至少200；
+- 仅在SC未屏蔽对象token的68张完整图上，61图SC对象NLL优于base，paired image mean CI为`[-0.234,-0.097]`。
+
+后一个正结果存在明确选择偏差：SC cutoff已经删除大量低概率真实token，剩余token上的归一化NLL不能与完整base分布公平比较。因此不能用它证明SC是合格teacher。
+
+| 门槛 | 结果 | 判定 |
+|---|---:|---|
+| 100图、无对齐失败 | 100、0失败 | 通过 |
+| 所有SC目标logprob finite | 507个不可用 | **失败** |
+| 对象token ≥200 | 153 | **失败** |
+| SC对象NLL显著优于base | 条件子集CI<0 | 描述性通过但有选择偏差 |
+| SC对象NLL不差于VHR | 条件子集通过 | 描述性通过 |
+| 全tokenNLL最大回退0.02 | 因507个被屏蔽不可公平判定 | **失败** |
+| 改善对象图比例 ≥60% | 条件子集89.7% | 描述性通过 |
+
+**总判定：失败。** 按第5节停止规则，不安装PEFT/TRL，不生成5000图teacher数据，不训练LoRA，不扫描alpha/beta或移除plausibility mask。CIRD源码只保留为teacher分布诊断工具。
+
+连续training-free gate和蒸馏gate的负结果说明，当前最有价值的下一步不是继续发明VHR变体，而是把已显著成立的RR-SC方法迁移到现代backbone并扩展标准benchmark，判断其核心贡献能否支撑跨架构论文。

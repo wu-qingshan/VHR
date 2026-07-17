@@ -92,3 +92,5 @@ git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-2026
 ## CIRD-VHR teacher gate检查点
 
 CIRD的token级因果残差蒸馏设计、整段DPO可行性否决、COCO train 100图teacher-forcing gate和固定ID检查点为 `cird-teacher-preregistered-20260717`。该标签不包含训练依赖、teacher输出、LoRA权重或效果实验。
+
+CIRD forced-token实现、固定100图数据下载脚本、teacher分析和正式gate否决检查点为 `cird-teacher-negative-20260717`。该标签没有安装PEFT/TRL、没有模型权重或效果结果；`cird_teacher_*_results/`保持未跟踪。
