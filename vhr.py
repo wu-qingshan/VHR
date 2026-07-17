@@ -29,6 +29,9 @@ def vhr_forward(
     avhr_tau: float = 1.0,
     avhr_rho_max: float = 2.0,
     avhr_gamma_l: float = 1.0,
+    saver_diagnostic: bool = False,
+    saver_image_start: Optional[int] = None,
+    saver_image_count: Optional[int] = None,
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     """
@@ -272,6 +275,24 @@ def vhr_forward(
             if getattr(self, "vhr_directional_active", False) and getattr(self, "vhr_directional_heads", None) is not None:
                 active_heads = self.vhr_directional_heads
             attn_output[:, active_heads, :, :] = aug_ratio * attn_output[:, active_heads, :, :]
+
+    if saver_diagnostic and q_len == 1 and getattr(self, "vhr_phase", None) != "vanilla":
+        active_heads = getattr(self, "aug_heads", None)
+        if active_heads is not None and active_heads.numel() > 0:
+            if saver_image_start is None or saver_image_count is None:
+                raise ValueError("SAVER diagnostic requires image token start and count")
+            image_end = saver_image_start + saver_image_count
+            if saver_image_start < 0 or image_end > key_states.shape[-2]:
+                raise ValueError(
+                    f"Invalid SAVER image token range [{saver_image_start}, {image_end}) "
+                    f"for key length {key_states.shape[-2]}"
+                )
+            selected_query = query_states[0, active_heads, -1, :].float()
+            selected_keys = key_states[0, active_heads, saver_image_start:image_end, :].float()
+            image_scores = torch.einsum("hd,hpd->hp", selected_query, selected_keys) / math.sqrt(
+                self.head_dim
+            )
+            self.vhr_saver_last_map = torch.softmax(image_scores, dim=-1).mean(dim=0).detach()
     
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.view(bsz, q_len, -1)
@@ -307,6 +328,9 @@ def replace_attn(
     avhr_tau=1.0,
     avhr_alpha=0.5,
     avhr_rho_max=2.0,
+    saver_diagnostic=False,
+    saver_image_start=None,
+    saver_image_count=None,
 ):
     """绑定每一层的 attention forward。
 
@@ -338,6 +362,9 @@ def replace_attn(
                 avhr_tau=avhr_tau,
                 avhr_rho_max=avhr_rho_max,
                 avhr_gamma_l=gamma_l,
+                saver_diagnostic=saver_diagnostic,
+                saver_image_start=saver_image_start,
+                saver_image_count=saver_image_count,
             )
             # 清空可能残留的状态
             layer.self_attn.attn_output_tc = None
@@ -348,6 +375,7 @@ def replace_attn(
             layer.self_attn.vhr_directional_heads = None
             layer.self_attn.vhr_directional_active = False
             layer.self_attn.vhr_phase = None
+            layer.self_attn.vhr_saver_last_map = None
         else:
             layer.self_attn.forward = partial(forward, layer.self_attn)
             layer.self_attn.attn_output_tc = None
@@ -358,6 +386,7 @@ def replace_attn(
             layer.self_attn.vhr_directional_heads = None
             layer.self_attn.vhr_directional_active = False
             layer.self_attn.vhr_phase = None
+            layer.self_attn.vhr_saver_last_map = None
 
 
 def set_directional_active(model, active):
@@ -371,3 +400,17 @@ def set_vhr_phase(model, phase):
     """Set the explicit prefill/decode branch used by multi-view VHR modes."""
     for layer in get_layers(model):
         layer.self_attn.vhr_phase = phase
+
+
+def collect_saver_attention_map(model):
+    """Aggregate and clear the latest per-layer selected-head image attention maps."""
+    maps = []
+    for layer in get_layers(model):
+        attention = layer.self_attn
+        current = getattr(attention, "vhr_saver_last_map", None)
+        if current is not None:
+            maps.append(current)
+            attention.vhr_saver_last_map = None
+    if not maps:
+        return None
+    return torch.stack(maps).mean(dim=0)

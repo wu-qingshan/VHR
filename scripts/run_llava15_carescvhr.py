@@ -14,6 +14,7 @@ METHODS = {
     "scvhr": "scvhr-care-dev-h14-a05-b01",
     "cascvhr": "cascvhr-care-dev-h14-a05-b01",
     "carescvhr": "carescvhr-care-dev-h14-a05-b01",
+    "saverdiagscvhr": "saverdiagscvhr-engineering-h14-a05-b01",
 }
 
 

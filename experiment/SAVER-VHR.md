@@ -62,7 +62,7 @@ $$
 
 ## 4. 主动局部复核
 
-从 $A$ 生成局部区域：选择高于 `mean(A)+std(A)` 的 patch；为空时选择最大 patch；取其最小包围框并固定扩张一个 patch。该统计规则在实现前固定，不扫描 top-k 或 crop ratio。
+从 $A$ 生成局部区域：选择高于 `mean(A)+std(A)` 的 patch；为空时选择最大 patch；只保留包含全局最大 patch 的4连通分量，取其最小包围框并固定扩张一个 patch。该统计规则在效果实验前固定，不扫描 top-k 或 crop ratio。使用峰值连通分量是为了避免多个空间离散高响应点的总包围框退化成近似全图。
 
 将原图按包围框裁剪并 resize 回模型输入大小，运行一个**仅当前 switch 步使用**的 local base verification forward，得到 $\ell_L$。
 
@@ -170,3 +170,11 @@ Active-Look 使用全局/局部冲突触发视觉重看。SAVER 的触发来自 
 - 后续效果目录：`saver_dev_results/`、`saver_validation_results/`；
 - 不修改或覆盖任何 `care_*`、`scvhr_*`、`rrscvhr_*` 历史结果；
 - 恢复起点：`care-scvhr-dev-negative-20260717`。
+
+## 11. 工程诊断日志
+
+- 2026-07-17：实现仅诊断的 selected-head image-token map 捕获；默认关闭，不执行local verification。576个视觉token稳定恢复为24×24。
+- 2026-07-17：CARE dev首图上，诊断版SC与标准SC的ID/text/confidence逐字段一致；73个解码步均得到finite且归一化的map，平均std=0.0080，72/72相邻步不完全相同。
+- 2026-07-17：初版将全部 `mean+std` 高响应patch共同取包围框，平均覆盖81.68%图像，未形成有效局部区域。该结果判定为区域构造工程失败，不进入效果实验。
+- 2026-07-17：在不查看任何CHAIR效果的前提下，将区域定义修正为“包含全局最大patch的4连通高响应分量+一patch扩张”；阈值仍为`mean+std`，不扫描。需重新验证输出等价性和区域面积。
+- 2026-07-17：第二次同图诊断再次与标准SC逐字段一致；73/73 map finite、归一化误差均值 `1.31e-8`、平均std仍为0.0080、72/72相邻步不完全相同。峰值连通分量在该图为单patch，扩张后固定3×3，平均bbox面积降至1.5625%。区域现在空间连贯且足够局部，但尚未验证raw-image坐标映射、crop processor和完整prefix local forward。

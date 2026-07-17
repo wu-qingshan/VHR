@@ -6,6 +6,7 @@ from generation import (
     apply_intervention_stability_guard,
     candidate_completes_exact_cycle,
     compute_counterfactual_aligned_logits,
+    summarize_saver_attention_map,
 )
 
 
@@ -42,6 +43,17 @@ class CareHelperTests(unittest.TestCase):
         self.assertTrue(candidate_cycle.item())
         self.assertFalse(intervention_cycle.item())
         self.assertTrue(torch.equal(routed, intervention_logits))
+
+    def test_saver_map_summary_is_normalized_and_square(self):
+        summary = summarize_saver_attention_map(torch.arange(1, 577, dtype=torch.float32))
+        normalized = summary.pop("normalized_map")
+        self.assertEqual(summary["token_count"], 576)
+        self.assertEqual(summary["side"], 24)
+        self.assertAlmostEqual(summary["sum"], 1.0, places=6)
+        self.assertGreater(summary["std"], 0.0)
+        self.assertEqual(normalized.shape, (576,))
+        self.assertTrue(0 < summary["bbox_area_fraction"] <= 1)
+        self.assertTrue(0 < summary["peak_component_patch_fraction"] <= 1)
 
 
 if __name__ == "__main__":

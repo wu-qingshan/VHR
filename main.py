@@ -169,6 +169,7 @@ class HallucinationTest:
                         "vhr_visual_evidence_gate": "vegscvhr" in self.method,
                         "vhr_counterfactual_alignment": use_counterfactual_alignment,
                         "vhr_stability_guard": "carescvhr" in self.method,
+                        "vhr_saver_diagnostic": "saverdiag" in self.method,
                         "vhr_logit_alpha": self.vhr_logit_alpha,
                         "vhr_logit_beta": self.vhr_logit_beta,
                     }
@@ -227,6 +228,7 @@ class HallucinationTest:
                     {
                         "vhr_image_start": img_start,
                         "vhr_image_end": img_token_end,
+                        "vhr_image_count": self.num_img_tokens,
                     }
                 )
 
@@ -345,6 +347,10 @@ class HallucinationTest:
                     result_row["stability_stats"] = dict(
                         self.model._last_vhr_stability_stats
                     )
+            if "saverdiag" in self.method:
+                result_row["saver_diagnostic_stats"] = dict(
+                    self.model._last_vhr_saver_diagnostic_stats
+                )
             if response_route is not None:
                 result_row["response_route"] = response_route
             output_file.write(json.dumps(result_row) + "\n")

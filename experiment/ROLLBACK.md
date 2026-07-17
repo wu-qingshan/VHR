@@ -103,3 +103,17 @@ git switch -c restore/care-dev-negative care-scvhr-dev-negative-20260717
 ```
 
 SAVER 区域级主动视觉复核的纯设计与工程可行性检查点为 `saver-feasibility-20260717`。该标签不包含 SAVER 实现或效果实验，只固定 switch-trigger、selected-head 区域图、local candidate-pair verification、成本披露和新数据隔离要求。
+
+SAVER selected-head image-token map 工程诊断检查点为 `saver-map-diagnostic-20260717`。该标签包含：
+
+- 默认关闭的 `vhr_saver_diagnostic` 独立开关；
+- selected heads 的 query-key image-token map 捕获与逐层聚合；
+- 576 token 到 24x24 网格、finite/归一化/时间变化诊断；
+- “峰值4连通分量 + 一 patch 扩张”的固定区域构造；
+- 一图上诊断 SC 与冻结标准 SC 的逐字段等价验证。
+
+该检查点不包含 raw-image 坐标映射、crop processor、local forward 或任何 SAVER 效果实验。诊断输出目录 `saver_diagnostic_results/` 与 `saver_diagnostic_v2_results/` 始终保持未跟踪。恢复方式：
+
+```bash
+git switch -c restore/saver-map-diagnostic saver-map-diagnostic-20260717
+```

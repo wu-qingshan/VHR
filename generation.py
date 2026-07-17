@@ -13,7 +13,12 @@ except ImportError:  # 新版 transformers (>=4.51) 已移除该私有符号
         )
 from transformers.generation.configuration_utils import *
 
-from vhr import replace_attn as replace_attn_vhr, set_directional_active, set_vhr_phase
+from vhr import (
+    collect_saver_attention_map,
+    replace_attn as replace_attn_vhr,
+    set_directional_active,
+    set_vhr_phase,
+)
 
 __version__ = "4.45.0"
 
@@ -123,6 +128,62 @@ def apply_intervention_stability_guard(
     return routed_logits, guarded, candidate_cycle, intervention_cycle
 
 
+def summarize_saver_attention_map(attention_map):
+    """Validate a square image-token map and derive its fixed statistical crop box."""
+    if attention_map.ndim != 1:
+        raise ValueError("SAVER attention map must be one-dimensional")
+    token_count = attention_map.numel()
+    side = math.isqrt(token_count)
+    if side * side != token_count:
+        raise ValueError(f"SAVER image token count must be square, got {token_count}")
+    if not torch.isfinite(attention_map).all():
+        raise ValueError("SAVER attention map contains non-finite values")
+    total = attention_map.sum()
+    if total <= 0:
+        raise ValueError("SAVER attention map has non-positive mass")
+    normalized = attention_map / total
+    grid = normalized.view(side, side)
+    selected = grid > grid.mean() + grid.std()
+    if not selected.any():
+        selected.view(-1)[grid.argmax()] = True
+    selected_cpu = selected.detach().cpu()
+    peak_index = int(grid.argmax().item())
+    peak = (peak_index // side, peak_index % side)
+    component = {peak}
+    frontier = [peak]
+    while frontier:
+        y, x = frontier.pop()
+        for neighbor in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
+            ny, nx = neighbor
+            if (
+                0 <= ny < side
+                and 0 <= nx < side
+                and selected_cpu[ny, nx]
+                and neighbor not in component
+            ):
+                component.add(neighbor)
+                frontier.append(neighbor)
+    coordinates = torch.tensor(sorted(component), dtype=torch.long)
+    y0 = max(0, int(coordinates[:, 0].min().item()) - 1)
+    y1 = min(side, int(coordinates[:, 0].max().item()) + 2)
+    x0 = max(0, int(coordinates[:, 1].min().item()) - 1)
+    x1 = min(side, int(coordinates[:, 1].max().item()) + 2)
+    top_values, top_indices = normalized.topk(min(5, token_count))
+    return {
+        "token_count": token_count,
+        "side": side,
+        "sum": float(normalized.sum().item()),
+        "std": float(normalized.std().item()),
+        "bbox": [x0, y0, x1, y1],
+        "bbox_area_fraction": (x1 - x0) * (y1 - y0) / token_count,
+        "selected_patch_fraction": float(selected.float().mean().item()),
+        "peak_component_patch_fraction": len(component) / token_count,
+        "top_indices": [int(index) for index in top_indices.tolist()],
+        "top_values": [float(value) for value in top_values.tolist()],
+        "normalized_map": normalized,
+    }
+
+
 def _vhr_decoding(
     self,
     input_ids: torch.LongTensor,
@@ -191,6 +252,7 @@ def _vhr_decoding(
     use_visual_evidence_gate = generation_config.vhr_visual_evidence_gate
     use_counterfactual_alignment = generation_config.vhr_counterfactual_alignment
     use_stability_guard = generation_config.vhr_stability_guard
+    use_saver_diagnostic = generation_config.vhr_saver_diagnostic
     use_text_contrast = use_visual_evidence_gate or use_counterfactual_alignment
     use_aux_contrast = use_vcd or use_base_contrast
     if use_vcd and use_base_contrast:
@@ -215,6 +277,8 @@ def _vhr_decoding(
         raise ValueError("Counterfactual alignment is a separate alternative to VEG, DG, and PD")
     if use_stability_guard and not use_counterfactual_alignment:
         raise ValueError("Stability guarding requires counterfactual alignment")
+    if use_saver_diagnostic and not use_base_contrast:
+        raise ValueError("SAVER diagnostics require VHR self-contrast")
 
     disagreement_total_steps = 0
     disagreement_contrast_steps = 0
@@ -243,6 +307,14 @@ def _vhr_decoding(
     stability_guarded_steps = 0
     stability_candidate_cycle_steps = 0
     stability_intervention_cycle_steps = 0
+    saver_map_steps = 0
+    saver_finite_steps = 0
+    saver_sum_abs_error = 0.0
+    saver_std_sum = 0.0
+    saver_bbox_area_sum = 0.0
+    saver_changed_steps = 0
+    saver_previous_map = None
+    saver_examples = []
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -350,6 +422,31 @@ def _vhr_decoding(
         elif use_base_contrast:
             set_vhr_phase(self, "clean" if cur_len == prompt_length else "decode")
         outputs = self(**model_inputs, return_dict=True)
+
+        if use_saver_diagnostic:
+            saver_map = collect_saver_attention_map(self)
+            if saver_map is not None:
+                summary = summarize_saver_attention_map(saver_map)
+                normalized_map = summary.pop("normalized_map")
+                saver_map_steps += 1
+                saver_finite_steps += int(torch.isfinite(normalized_map).all().item())
+                saver_sum_abs_error += abs(summary["sum"] - 1.0)
+                saver_std_sum += summary["std"]
+                saver_bbox_area_sum += summary["bbox_area_fraction"]
+                if saver_previous_map is not None:
+                    cosine = torch.nn.functional.cosine_similarity(
+                        normalized_map,
+                        saver_previous_map,
+                        dim=0,
+                    )
+                    if float(cosine.item()) < 1.0 - 1e-7:
+                        saver_changed_steps += 1
+                    summary["cosine_to_previous"] = float(cosine.item())
+                else:
+                    summary["cosine_to_previous"] = None
+                saver_previous_map = normalized_map
+                if len(saver_examples) < 5:
+                    saver_examples.append(summary)
 
         if synced_gpus and this_peer_finished:
             continue  # don't waste resources running the code we don't need
@@ -632,6 +729,17 @@ def _vhr_decoding(
             "guard_rate": stability_guarded_steps / max(1, stability_total_steps),
             "candidate_cycle_steps": stability_candidate_cycle_steps,
             "intervention_cycle_steps": stability_intervention_cycle_steps,
+        }
+    if use_saver_diagnostic:
+        self._last_vhr_saver_diagnostic_stats = {
+            "map_steps": saver_map_steps,
+            "finite_steps": saver_finite_steps,
+            "all_maps_finite": saver_finite_steps == saver_map_steps,
+            "mean_sum_abs_error": saver_sum_abs_error / max(1, saver_map_steps),
+            "mean_map_std": saver_std_sum / max(1, saver_map_steps),
+            "changed_from_previous_steps": saver_changed_steps,
+            "mean_bbox_area_fraction": saver_bbox_area_sum / max(1, saver_map_steps),
+            "examples": saver_examples,
         }
 
     if return_dict_in_generate:
@@ -1826,7 +1934,10 @@ def generate(
                          use_avhr=generation_config.vhr_use_avhr,
                          avhr_tau=generation_config.vhr_tau,
                          avhr_alpha=generation_config.vhr_alpha,
-                         avhr_rho_max=generation_config.vhr_rho_max)
+                         avhr_rho_max=generation_config.vhr_rho_max,
+                         saver_diagnostic=generation_config.vhr_saver_diagnostic,
+                         saver_image_start=generation_config.vhr_image_start,
+                         saver_image_count=generation_config.vhr_image_count)
         try:
             result = self._vhr_decoding(
                 input_ids,
@@ -2222,6 +2333,7 @@ def generation_config_init(self, **kwargs):
     self.vhr_directional_delay = kwargs.pop("vhr_directional_delay", 64)
     self.vhr_image_start = kwargs.pop("vhr_image_start", None)
     self.vhr_image_end = kwargs.pop("vhr_image_end", None)
+    self.vhr_image_count = kwargs.pop("vhr_image_count", None)
     self.vhr_images_noisy = kwargs.pop("vhr_images_noisy", None)
     self.vhr_base_contrast = kwargs.pop("vhr_base_contrast", False)
     self.vhr_positive_delta_contrast = kwargs.pop("vhr_positive_delta_contrast", False)
@@ -2230,6 +2342,7 @@ def generation_config_init(self, **kwargs):
     self.vhr_visual_evidence_gate = kwargs.pop("vhr_visual_evidence_gate", False)
     self.vhr_counterfactual_alignment = kwargs.pop("vhr_counterfactual_alignment", False)
     self.vhr_stability_guard = kwargs.pop("vhr_stability_guard", False)
+    self.vhr_saver_diagnostic = kwargs.pop("vhr_saver_diagnostic", False)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters
