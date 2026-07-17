@@ -193,3 +193,15 @@ Qwen 上单一 CHAIR 正结果不足以声称达到论文目标。
 
 固定划分 tag 为 `qwen-scvhr-dev-split-20260717`。从此只允许在 dev 上做预注册的
 一次信号验证；validation/test 保持 locked。
+
+- 2026-07-17：新增独立 Qwen CHAIR runner 和严格 chunk merger，未修改历史
+  `main.py/generation.py/vhr.py`。固定生成配置为 eager/bfloat16、greedy、模型原生
+  repetition penalty 1.05、max new tokens 512、layer 1 + last 14、VHR ratio 2、
+  SC alpha/beta 0.5/0.1。
+- 2026-07-17：dev 首图仅用于完整 runner smoke。vanilla/VHR/SC 分别生成
+  315/512/268 token；vanilla 和 SC 正常 EOS，VHR 达到上限并出现重复。该图三方法
+  CHAIRs 均为 1，不能据单图判断效果，但确认 Qwen 上存在需要由 300 图门槛正式衡量
+  的 VHR 稳定性风险。没有据此修改参数或后处理。
+
+完整 dev runner 冻结 tag 为 `qwen-scvhr-dev-runner-ready-20260717`。下一步只运行
+这一个固定配置；若 dev 任一预注册门槛失败，立即停止，不运行 locked validation。

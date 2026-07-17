@@ -116,3 +116,7 @@ git switch -c restore/qwen-scvhr-engineering qwen-scvhr-engineering-ready-202607
 排除 3,146 个历史/机制/smoke COCO id 后的 Qwen 300/500/500 互斥划分标签为
 `qwen-scvhr-dev-split-20260717`。完整 exclusion manifest 与三个 split SHA256 均在
 该标签中；该标签尚未运行任何 Qwen 效果样本。
+
+Qwen 固定 CHAIR chunk runner、严格 merger 和完整 512-token 单图 smoke 后的标签为
+`qwen-scvhr-dev-runner-ready-20260717`。从该标签运行 dev，不允许再修改层数、倍率、
+alpha/beta、repetition penalty 或最大长度。
