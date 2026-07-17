@@ -69,3 +69,5 @@ DG dev 负结果与机制结论的检查点标签为 `dgscvhr-dev-negative-20260
 标准 SC token-switch 诊断实现与一图逐字等价验证的检查点标签为 `scvhr-switch-diagnostic-ready-20260717`。
 
 100 图逐字等价诊断与 VEG 下一方向结论的检查点标签为 `scvhr-switch-diagnostic-complete-20260717`。
+
+VEG 三分支预注册实现与完整 EOS 烟雾测试的检查点标签为 `vegscvhr-preregistered-20260717`。

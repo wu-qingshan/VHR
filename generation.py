@@ -39,6 +39,20 @@ def apply_disagreement_gate(primary_logits, contrast_logits, contrasted_logits):
     return torch.where(disagreement, contrasted_logits, primary_logits), disagreement
 
 
+def apply_visual_evidence_gate(primary_logits, base_logits, text_logits, contrasted_logits):
+    """Allow a proposed SC switch only when its relative visual support is non-negative."""
+    primary_top = primary_logits.argmax(dim=-1, keepdim=True)
+    proposed_top = contrasted_logits.argmax(dim=-1, keepdim=True)
+    proposed_switch = proposed_top != primary_top
+    visual_support = base_logits - text_logits
+    proposed_support = visual_support.gather(-1, proposed_top)
+    primary_support = visual_support.gather(-1, primary_top)
+    support_margin = proposed_support - primary_support
+    allowed_switch = proposed_switch & (support_margin >= 0)
+    routed_logits = torch.where(allowed_switch, contrasted_logits, primary_logits)
+    return routed_logits, proposed_switch, allowed_switch, support_margin
+
+
 def _vhr_decoding(
     self,
     input_ids: torch.LongTensor,
@@ -104,6 +118,7 @@ def _vhr_decoding(
     use_base_contrast = generation_config.vhr_base_contrast
     use_disagreement_gate = generation_config.vhr_disagreement_gate
     use_switch_diagnostics = generation_config.vhr_switch_diagnostics
+    use_visual_evidence_gate = generation_config.vhr_visual_evidence_gate
     use_aux_contrast = use_vcd or use_base_contrast
     if use_vcd and use_base_contrast:
         raise ValueError("Choose either noisy-image VCD or VHR self-contrast, not both")
@@ -113,6 +128,10 @@ def _vhr_decoding(
         raise ValueError("Disagreement gating requires VHR self-contrast")
     if use_switch_diagnostics and not use_base_contrast:
         raise ValueError("Switch diagnostics require VHR self-contrast")
+    if use_visual_evidence_gate and not use_base_contrast:
+        raise ValueError("Visual-evidence gating requires VHR self-contrast")
+    if use_visual_evidence_gate and (use_disagreement_gate or generation_config.vhr_positive_delta_contrast):
+        raise ValueError("Visual-evidence gating cannot be combined with DG or positive-delta contrast")
 
     disagreement_total_steps = 0
     disagreement_contrast_steps = 0
@@ -125,6 +144,12 @@ def _vhr_decoding(
     switch_same_selected_delta_sum = 0.0
     switch_same_vhr_delta_sum = 0.0
     switch_same_margin_sum = 0.0
+    visual_total_steps = 0
+    visual_proposed_switch_steps = 0
+    visual_allowed_switch_steps = 0
+    visual_blocked_switch_steps = 0
+    visual_allowed_margin_sum = 0.0
+    visual_blocked_margin_sum = 0.0
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -148,6 +173,8 @@ def _vhr_decoding(
     model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
     model_kwargs_tc = None
     model_kwargs_cd = None
+    input_ids_tc = None
+    outputs_tc = None
 
     while self._has_unfinished_sequences(
         this_peer_finished, synced_gpus, device=input_ids.device, cur_len=cur_len, max_length=max_length
@@ -203,7 +230,8 @@ def _vhr_decoding(
                 set_vhr_phase(self, "noisy")
                 outputs_nc = self(**model_inputs_nc, return_dict=True)
                 del outputs_nc
-            del outputs_tc
+            if not use_visual_evidence_gate:
+                del outputs_tc
 
             if use_vcd:
                 model_kwargs_cd = copy.deepcopy(model_kwargs)
@@ -248,6 +276,20 @@ def _vhr_decoding(
             outputs_cd = self(**model_inputs_cd, return_dict=True)
             next_token_logits_cd = outputs_cd.logits.clone()[:, -1, :].float()
 
+            next_token_logits_tc = None
+            if use_visual_evidence_gate:
+                if cur_len != prompt_length:
+                    model_inputs_tc = self.prepare_inputs_for_generation(input_ids_tc, **model_kwargs_tc)
+                    model_inputs_tc.update(
+                        {"output_attentions": output_attentions} if output_attentions else {}
+                    )
+                    model_inputs_tc.update(
+                        {"output_hidden_states": output_hidden_states} if output_hidden_states else {}
+                    )
+                    set_vhr_phase(self, "vanilla")
+                    outputs_tc = self(**model_inputs_tc, return_dict=True)
+                next_token_logits_tc = outputs_tc.logits.clone()[:, -1, :].float()
+
             if use_switch_diagnostics:
                 diagnostic_vhr_argmax = next_token_logits.argmax(dim=-1, keepdim=True)
                 diagnostic_base_argmax = next_token_logits_cd.argmax(dim=-1, keepdim=True)
@@ -273,6 +315,26 @@ def _vhr_decoding(
                 )
                 disagreement_total_steps += disagreement.numel()
                 disagreement_contrast_steps += int(disagreement.sum().item())
+            if use_visual_evidence_gate:
+                contrasted_logits, proposed_switch, allowed_switch, support_margin = (
+                    apply_visual_evidence_gate(
+                        next_token_logits,
+                        next_token_logits_cd,
+                        next_token_logits_tc,
+                        contrasted_logits,
+                    )
+                )
+                blocked_switch = proposed_switch & (~allowed_switch)
+                visual_total_steps += proposed_switch.numel()
+                visual_proposed_switch_steps += int(proposed_switch.sum().item())
+                visual_allowed_switch_steps += int(allowed_switch.sum().item())
+                visual_blocked_switch_steps += int(blocked_switch.sum().item())
+                visual_allowed_margin_sum += float(
+                    (support_margin * allowed_switch.float()).sum().item()
+                )
+                visual_blocked_margin_sum += float(
+                    (support_margin * blocked_switch.float()).sum().item()
+                )
             next_token_scores = logits_processor(input_ids, contrasted_logits)
         else:
             next_token_scores = logits_processor(input_ids, next_token_logits)
@@ -348,6 +410,13 @@ def _vhr_decoding(
                 model_kwargs_cd,
                 is_encoder_decoder=self.config.is_encoder_decoder,
             )
+        if use_visual_evidence_gate:
+            input_ids_tc = torch.cat([input_ids_tc, next_tokens[:, None]], dim=-1)
+            model_kwargs_tc = self._update_model_kwargs_for_generation(
+                outputs_tc,
+                model_kwargs_tc,
+                is_encoder_decoder=self.config.is_encoder_decoder,
+            )
         # stop when each sentence is finished
         unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
         this_peer_finished = unfinished_sequences.max() == 0
@@ -358,6 +427,8 @@ def _vhr_decoding(
         del outputs
         if use_aux_contrast:
             del outputs_cd
+        if use_visual_evidence_gate:
+            del outputs_tc
 
     if streamer is not None:
         streamer.end()
@@ -387,6 +458,21 @@ def _vhr_decoding(
             / max(1, switch_same_argmax_steps),
             "same_switch_score_margin_mean": switch_same_margin_sum
             / max(1, switch_same_argmax_steps),
+        }
+    if use_visual_evidence_gate:
+        self._last_vhr_visual_evidence_stats = {
+            "total_steps": visual_total_steps,
+            "proposed_switch_steps": visual_proposed_switch_steps,
+            "allowed_switch_steps": visual_allowed_switch_steps,
+            "blocked_switch_steps": visual_blocked_switch_steps,
+            "proposed_switch_rate": visual_proposed_switch_steps / max(1, visual_total_steps),
+            "allowed_switch_rate": visual_allowed_switch_steps / max(1, visual_total_steps),
+            "allow_fraction_of_proposals": visual_allowed_switch_steps
+            / max(1, visual_proposed_switch_steps),
+            "allowed_support_margin_mean": visual_allowed_margin_sum
+            / max(1, visual_allowed_switch_steps),
+            "blocked_support_margin_mean": visual_blocked_margin_sum
+            / max(1, visual_blocked_switch_steps),
         }
 
     if return_dict_in_generate:
@@ -1982,6 +2068,7 @@ def generation_config_init(self, **kwargs):
     self.vhr_positive_delta_contrast = kwargs.pop("vhr_positive_delta_contrast", False)
     self.vhr_disagreement_gate = kwargs.pop("vhr_disagreement_gate", False)
     self.vhr_switch_diagnostics = kwargs.pop("vhr_switch_diagnostics", False)
+    self.vhr_visual_evidence_gate = kwargs.pop("vhr_visual_evidence_gate", False)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters
