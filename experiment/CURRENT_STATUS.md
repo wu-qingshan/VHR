@@ -1,7 +1,22 @@
 # VHR 改进当前研究状态
 
-> 更新时间：2026-07-16
+> 更新时间：2026-07-17
 > 详细全过程见 `experiment/CS-VHR.md`；原项目诊断见 `EXPERIMENT_DIAGNOSIS.md`。
+
+## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
+
+统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：
+
+| 任务 | VHR | SC | RR | RR 相对 SC |
+|---|---:|---:|---:|---:|
+| CHAIR 秒/图 | 4.2424 | 8.8068 | 8.7104 | 同一路径，约等速 |
+| POPE 秒/题 | 0.4956 | 0.9135 | 0.4969 | **1.838× 加速** |
+
+CHAIR 上 RR=SC、POPE 上 RR=VHR 均逐字段一致。RR 因此同时保留 30.40/8.42 的 CHAIR 结果、恢复 VHR 的 POPE F1 85.47，并在 binary 上恢复单分支成本。
+
+完整文本质量评测发现新的负结果：RR/SC 平均更长（106.56→112.87 words），geometric BLEU 7.84→6.71、METEOR 16.37→14.84；per-caption repeated 2/3/4-gram 均增加。exact cycle 从 6/2500（0.24%）升到 33/2500（1.32%），配对 McNemar `p=7.43e-6`。因此当前方案是“更少对象幻觉 + binary 无回归 + binary 更高效”，不是全面无损提升。
+
+下一主方向：**stability-aware token routing**。只在 SC 候选相对 VHR 引入重复 n-gram/连续循环风险时回退 VHR，避免此前全局 no-repeat 对正常描述的破坏。本次正式 CHAIR 只能用于发现问题，后续阈值和规则必须在新开发集上确定，并使用新的锁定验证集；不能回看正式结果调参。详细数字见 `experiment/RR-SC-VHR-EFFICIENCY-QUALITY.md`。
 
 ## 最新进展：SC-VHR 的 LLaVA-1.5 冻结迁移
 

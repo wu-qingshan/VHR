@@ -97,11 +97,25 @@ Response-Routed SC-VHR（RR-SC-VHR）：
 
 ## 10. 效率
 
-- 纯 SC 官方 POPE 四块 750 题分别耗时 683/675/712/726 秒，约 0.90–0.97 秒/题；
-- 同进程 VHR/RR POPE 小样本均约 4 秒/10题/分割，即约 0.4–0.5 秒/题；
-- RR 在 binary 路由下不创建 base contrast 分支，理论 forward 和 KV cache 从 2 套恢复为 1 套。实测符合约减半趋势，但正式论文应在相同 GPU、完整集上补统一 latency/peak-memory profiling。
+- 同一次模型加载、同一 GPU、正反顺序两轮的统一 benchmark 已完成；全部输出等价检查通过，所有方法的轮间时延波动小于 2%。
+- CHAIR 秒/图均值：VHR 4.2424、SC 8.8068、RR 8.7104。开放描述 RR 与 SC 的 peak allocated 均为 15.1805 GiB，路径与成本一致。
+- POPE 秒/题均值：VHR 0.4956、SC 0.9135、RR 0.4969。RR 相对 SC 加速 **1.838×**，且输出逐字段等于 VHR。
+- POPE peak allocated：VHR/RR 14.8598 GiB，SC 14.8998 GiB；增量 peak 分别为 0.0776 与 0.1176 GiB。权重占主导，因此总峰值差比 forward/KV cache 的计算差更小。
+- 完整协议、原始两轮值与审计见 `experiment/RR-SC-VHR-EFFICIENCY-QUALITY.md`。
 
-## 11. 最终评价
+## 11. 文本质量补充
+
+完整 2500 图比较发现 SC/RR 并非文本质量无损：
+
+- VHR→RR/SC：平均 word 数 106.56→112.87；
+- geometric BLEU 7.84→6.71，METEOR 16.37→14.84，ROUGE-L 16.61→15.89；
+- per-caption distinct-1/2 0.5096/0.8203→0.4973/0.7944；
+- repeated 2/3/4-gram ratio 均上升约 2.4–2.7 个百分点；
+- exact cycle 6/2500→33/2500，McNemar exact `p=7.43e-6`。
+
+这说明自对比分支在降低对象幻觉的同时，固定外推也会强化少量语言模板和循环。绝对 cycle rate 仍只有 1.32%，但必须作为限制披露，并成为下一阶段 stability-aware routing 的直接动机。
+
+## 12. 最终评价
 
 RR-SC-VHR 是目前最可靠的实用主方案：
 
@@ -110,4 +124,4 @@ RR-SC-VHR 是目前最可靠的实用主方案：
 - 无新增连续参数，无验证集调参，路由规则与响应形式直接对应；
 - 消除了“同一强抑制策略跨任务通用”的错误假设。
 
-局限：响应形式路由本身较简单，论文创新核心仍应是 SC-VHR 的 intervention-isolated self-contrast；RR 应作为 calibration/decision policy 组件，而不是单独包装为主要算法创新。
+局限：响应形式路由本身较简单，论文创新核心仍应是 SC-VHR 的 intervention-isolated self-contrast；RR 应作为 calibration/decision policy 组件，而不是单独包装为主要算法创新。固定 SC 外推还存在 COCO overlap、局部重复和少量循环退化，后续方法应加入仅针对 SC-induced instability 的 token-level 回退，而不是使用已证明会伤害正常描述的全局 no-repeat 约束。

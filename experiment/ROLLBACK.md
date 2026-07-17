@@ -75,3 +75,16 @@ VEG 三分支预注册实现与完整 EOS 烟雾测试的检查点标签为 `veg
 VEG dev 部分正/门槛失败结果的检查点标签为 `vegscvhr-dev-negative-20260717`。锁定 validation 未运行。
 
 RR-SC-VHR 完整等价验证、物化脚本与正式 CHAIR/POPE 结果记录的检查点标签为 `rrscvhr-official-20260717`。正式结果目录 `rrscvhr_official_results/` 保持未跟踪。
+
+RR-SC-VHR 统一效率、COCO caption quality、重复/循环诊断和可复现分析脚本的检查点标签为 `rrscvhr-efficiency-quality-20260717`。该标签新增：
+
+- `scripts/benchmark_instructblip_rrscvhr.py`：同一次模型加载下的正反顺序效率测量；
+- `scripts/summarize_rrscvhr_benchmark.py`：输出等价性、两轮波动、均值和时延比审计；
+- `scripts/analyze_caption_quality.py`：distinct、repeated n-gram 和 exact cycle 配对统计；
+- `experiment/RR-SC-VHR-EFFICIENCY-QUALITY.md`：完整效率与质量结论，包括重复/循环负结果。
+
+`rrscvhr_benchmark_results/`、`rrscvhr_quality_results/` 和 `rrscvhr_official_results/` 均保持未跟踪，不进入标签。恢复方式：
+
+```bash
+git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-20260717
+```
