@@ -3,7 +3,7 @@
 > 日期：2026-07-17
 > 分支：`research/qwen-scvhr`
 > 起点：`rrscvhr-efficiency-quality-20260717`
-> 当前状态：工程与效果实验预注册；尚未下载权重、尚未运行效果数据
+> 当前状态：E0/E1/E2 工程门槛全部通过；尚未创建效果划分、尚未运行效果数据
 
 ## 1. 目的与研究问题
 
@@ -36,12 +36,14 @@ CHAIRs/CHAIRi 从 `37.84/9.72` 降至 `30.40/8.42`，同时通过响应形式路
 - 模型：`Qwen/Qwen2.5-VL-7B-Instruct`
 - Transformers：`4.51.3`
 - qwen-vl-utils：`0.0.14`
-- Torch：`2.1.2`
-- dtype：`float16`
+- Torch：`2.5.1+cu121`
+- dtype：模型原生 `bfloat16`（A6000 支持；避免 Qwen eager attention 对 fp16 inf 的
+  额外修补路径）
 - attention implementation：首轮使用 `eager` 完成数值审计；通过后才允许比较
   `sdpa`，不得因效果指标选择实现。
 - generation：greedy，`do_sample=False`，`num_beams=1`，首轮 smoke
-  `max_new_tokens=64`；CHAIR 固定为项目现有详细描述上限。
+  `max_new_tokens=64`；保留模型原生 `repetition_penalty=1.05`，CHAIR 固定为项目
+  现有详细描述上限。
 
 权重下载后必须补记 Hugging Face revision/commit、文件 manifest 和总大小。
 
@@ -148,3 +150,34 @@ Qwen 上单一 CHAIR 正结果不足以声称达到论文目标。
 - 2026-07-17：从 `rrscvhr-efficiency-quality-20260717` 创建
   `research/qwen-scvhr`；确认历史结果目录仍为 untracked，未携带 CIRD 分支代码。
 - 2026-07-17：冻结独立环境版本、工程门槛、数据隔离方案和停止规则；尚未运行模型。
+- 2026-07-17：创建 `.venv-qwen` 时发现当前实际 GPU runtime 为
+  `torch 2.5.1+cu121 / torchvision 0.20.1+cu121`，并非仓库旧 requirements 中的
+  2.1.2。模型尚未运行，因此将 Qwen 固定版本更正为 2.5.1；Qwen venv 只读复用
+  `/home/nlp/.venv` 的 Torch/CUDA、NumPy/Pillow 等基础 runtime，本地优先安装
+  Transformers 4.51.3、qwen-vl-utils 0.0.14 及其依赖，不修改原环境。
+- 2026-07-17：源码与 config 审计确认模型为 28 层、28 query heads、4 KV heads，
+  `spatial_merge_size=2`，原生 dtype 为 bfloat16。冻结 Qwen VHR 层为 layer 1 +
+  last 14，与原 VHR 的 LLaVA 类主干策略一致；不在 dev 上扫描层数。
+- 2026-07-17：首次 E1 中关闭 patch 的首步 logits 误差为 0，ratio=1、head finite、
+  prefill 次数和 A->B 状态清理均通过，但独立 vanilla 循环从第 12 个 token 起与
+  HF generate 分歧。诊断确认不是 cache/mRoPE，而是模型 generation config 固定的
+  `repetition_penalty=1.05` 尚未在独立循环应用；仅修复这一工程遗漏后重跑 E1，
+  不运行效果数据。
+- 2026-07-17：完整下载固定 revision，共 16 个文件、`16,595,981,281` bytes；
+  SHA256/大小见 `experiment/qwen25_vl_7b_model_manifest.json`。
+- 2026-07-17：E0 原生 smoke 通过。两张 COCO 图的动态 image token 分别为
+  391/234，均与 `image_grid_thw / spatial_merge_size^2` 一致；同图两次 greedy
+  逐 token 相同；两图分别生成 23/29 token 后正常 EOS；峰值 allocated
+  15.91/15.66 GiB。原始审计 SHA256 为
+  `7a142d1d4d96ff3516add54c24dc884bcc4761efe0f3ab7b316fab8e7ff91851`，结果目录
+  `qwen_native_smoke_results/` 保持 untracked。
+- 2026-07-17：修复 repetition processor 后 E1/E2 全部通过：关闭 patch 首步
+  logits 最大绝对误差 `0.0`；独立 vanilla 与 HF generate 16/16 token 一致；
+  ratio=1 与 vanilla 一致；A->B 与 fresh B 一致；15 个目标层均恰好执行一次
+  text/clean prefill，selected heads 合法且 head vary 全部 finite；SC 的 VHR/base
+  forward 均为 16 次；开放问题 RR=SC、二元问题 RR=VHR。原始审计 SHA256 为
+  `f3eae930d073ce1184726b8da3dedbbaedf259703e69360880bd2ab0de39229f`，结果目录
+  `qwen_vhr_smoke_results/` 保持 untracked。
+
+工程门槛完成后的固定 tag 为 `qwen-scvhr-engineering-ready-20260717`。下一步只生成
+预注册的新互斥 dev/locked validation/test 划分，尚不允许运行 validation/test。

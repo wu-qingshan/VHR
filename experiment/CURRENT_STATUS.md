@@ -14,6 +14,11 @@
 效果划分；dev 未过预注册门槛时不运行 locked validation，也不扫描参数。完整协议见
 `experiment/QWEN-SC-VHR.md`。
 
+当前 E0/E1/E2 已全部通过：固定 revision 完整下载；原生动态 image token、确定性和
+EOS 正常；关闭 patch 首步 logits 误差为 0；独立循环与 HF generate 一致；ratio=1、
+A->B 状态清理、GQA query-head 选头、SC 双 cache 和 RR 路由等价性均通过。尚未创建
+Qwen 效果划分、尚未运行 CHAIR/POPE。下一步为互斥划分与 dev 信号验证。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

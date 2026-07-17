@@ -103,3 +103,12 @@ git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-2026
 ```bash
 git switch -c restore/qwen-scvhr-preregistered qwen-scvhr-preregistered-20260717
 ```
+
+Qwen 原生 smoke、专用 GQA/mRoPE attention adapter、独立双 cache generation loop、
+ratio=1/HF generate/A->B/RR 等价性全部通过后的检查点标签为
+`qwen-scvhr-engineering-ready-20260717`。该标签包含模型 manifest，但不包含权重、
+`.venv-qwen/`、`qwen_native_smoke_results/` 或 `qwen_vhr_smoke_results/`。
+
+```bash
+git switch -c restore/qwen-scvhr-engineering qwen-scvhr-engineering-ready-20260717
+```
