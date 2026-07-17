@@ -101,3 +101,5 @@ git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-2026
 ```bash
 git switch -c restore/care-dev-negative care-scvhr-dev-negative-20260717
 ```
+
+SAVER 区域级主动视觉复核的纯设计与工程可行性检查点为 `saver-feasibility-20260717`。该标签不包含 SAVER 实现或效果实验，只固定 switch-trigger、selected-head 区域图、local candidate-pair verification、成本披露和新数据隔离要求。
