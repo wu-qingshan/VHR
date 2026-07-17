@@ -156,6 +156,14 @@ class HallucinationTest:
                         "vhr_rho_max": self.vhr_rho_max,
                     }
                 )
+            generate_kwargs.update(
+                {
+                    "vhr_vcrp_diagnostic": "vcrpdiag" in self.method,
+                    "vhr_vcrp_intervention": (
+                        "vcrpvhr" in self.method and "vcrpdiag" not in self.method
+                    ),
+                }
+            )
             if "scvhr" in self.method:
                 generate_kwargs.update(
                     {
@@ -324,6 +332,8 @@ class HallucinationTest:
                 result_row["visual_evidence_stats"] = dict(
                     self.model._last_vhr_visual_evidence_stats
                 )
+            if "vcrpdiag" in self.method or "vcrpvhr" in self.method:
+                result_row["vcrp_stats"] = dict(self.model._last_vcrp_stats)
             if response_route is not None:
                 result_row["response_route"] = response_route
             output_file.write(json.dumps(result_row) + "\n")

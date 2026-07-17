@@ -14,6 +14,7 @@ except ImportError:  # 新版 transformers (>=4.51) 已移除该私有符号
 from transformers.generation.configuration_utils import *
 
 from vhr import replace_attn as replace_attn_vhr, set_directional_active, set_vhr_phase
+from vcrp import collect_vcrp_step_stats, replace_vcrp_decoder_layers
 
 __version__ = "4.45.0"
 
@@ -119,6 +120,9 @@ def _vhr_decoding(
     use_disagreement_gate = generation_config.vhr_disagreement_gate
     use_switch_diagnostics = generation_config.vhr_switch_diagnostics
     use_visual_evidence_gate = generation_config.vhr_visual_evidence_gate
+    use_vcrp_diagnostic = generation_config.vhr_vcrp_diagnostic
+    use_vcrp_intervention = generation_config.vhr_vcrp_intervention
+    use_vcrp = use_vcrp_diagnostic or use_vcrp_intervention
     use_aux_contrast = use_vcd or use_base_contrast
     if use_vcd and use_base_contrast:
         raise ValueError("Choose either noisy-image VCD or VHR self-contrast, not both")
@@ -150,6 +154,7 @@ def _vhr_decoding(
     visual_blocked_switch_steps = 0
     visual_allowed_margin_sum = 0.0
     visual_blocked_margin_sum = 0.0
+    vcrp_token_stats = []
 
     # init attention / hidden states / scores tuples
     scores = () if (return_dict_in_generate and output_scores) else None
@@ -179,6 +184,7 @@ def _vhr_decoding(
     while self._has_unfinished_sequences(
         this_peer_finished, synced_gpus, device=input_ids.device, cur_len=cur_len, max_length=max_length
     ):
+        vcrp_current_stats = None
         if score_mode == "delayed_directional_linear":
             set_directional_active(self, cur_len - prompt_length >= directional_delay)
         # prepare model inputs
@@ -257,6 +263,9 @@ def _vhr_decoding(
         elif use_base_contrast:
             set_vhr_phase(self, "clean" if cur_len == prompt_length else "decode")
         outputs = self(**model_inputs, return_dict=True)
+        if use_vcrp:
+            vcrp_current_stats = collect_vcrp_step_stats(self)
+            vcrp_current_stats["step_index"] = cur_len - prompt_length
 
         if synced_gpus and this_peer_finished:
             continue  # don't waste resources running the code we don't need
@@ -366,6 +375,12 @@ def _vhr_decoding(
         else:  # argmax
             next_tokens = torch.argmax(next_token_scores, dim=-1)
 
+        if use_vcrp:
+            if next_tokens.numel() != 1:
+                raise ValueError("VCRP diagnostics currently require batch size 1")
+            vcrp_current_stats["selected_token_id"] = int(next_tokens[0].item())
+            vcrp_token_stats.append(vcrp_current_stats)
+
         if use_switch_diagnostics:
             selected = next_tokens.unsqueeze(-1)
             branch_disagreement = diagnostic_vhr_argmax != diagnostic_base_argmax
@@ -473,6 +488,11 @@ def _vhr_decoding(
             / max(1, visual_allowed_switch_steps),
             "blocked_support_margin_mean": visual_blocked_margin_sum
             / max(1, visual_blocked_switch_steps),
+        }
+    if use_vcrp:
+        self._last_vcrp_stats = {
+            "token_count": len(vcrp_token_stats),
+            "tokens": vcrp_token_stats,
         }
 
     if return_dict_in_generate:
@@ -1667,7 +1687,20 @@ def generate(
                          use_avhr=generation_config.vhr_use_avhr,
                          avhr_tau=generation_config.vhr_tau,
                          avhr_alpha=generation_config.vhr_alpha,
-                         avhr_rho_max=generation_config.vhr_rho_max)
+                         avhr_rho_max=generation_config.vhr_rho_max,
+                         vcrp_capture=(
+                             generation_config.vhr_vcrp_diagnostic
+                             or generation_config.vhr_vcrp_intervention
+                         ))
+        replace_vcrp_decoder_layers(
+            self,
+            target_layers=generation_config.vhr_layers,
+            enabled=(
+                generation_config.vhr_vcrp_diagnostic
+                or generation_config.vhr_vcrp_intervention
+            ),
+            intervention=generation_config.vhr_vcrp_intervention,
+        )
         try:
             result = self._vhr_decoding(
                 input_ids,
@@ -1680,6 +1713,7 @@ def generate(
             )
         finally:
             replace_attn_vhr(self)
+            replace_vcrp_decoder_layers(self)
     elif generation_mode == GenerationMode.DOLA_GENERATION:
         if self._is_stateful:
             # DoLa decoding was not designed for stateful models, and would require some changes
@@ -2069,6 +2103,8 @@ def generation_config_init(self, **kwargs):
     self.vhr_disagreement_gate = kwargs.pop("vhr_disagreement_gate", False)
     self.vhr_switch_diagnostics = kwargs.pop("vhr_switch_diagnostics", False)
     self.vhr_visual_evidence_gate = kwargs.pop("vhr_visual_evidence_gate", False)
+    self.vhr_vcrp_diagnostic = kwargs.pop("vhr_vcrp_diagnostic", False)
+    self.vhr_vcrp_intervention = kwargs.pop("vhr_vcrp_intervention", False)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters

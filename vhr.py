@@ -29,6 +29,7 @@ def vhr_forward(
     avhr_tau: float = 1.0,
     avhr_rho_max: float = 2.0,
     avhr_gamma_l: float = 1.0,
+    vcrp_capture: bool = False,
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     """
@@ -111,6 +112,7 @@ def vhr_forward(
         dropout_p=self.attention_dropout if self.training else 0.0,
         is_causal=is_causal,
     )
+    vcrp_base_last = attn_output[:, :, -1:, :].clone() if vcrp_capture else None
 
     now_attn_output = attn_output[0, :, -1, :]
 
@@ -273,6 +275,12 @@ def vhr_forward(
                 active_heads = self.vhr_directional_heads
             attn_output[:, active_heads, :, :] = aug_ratio * attn_output[:, active_heads, :, :]
     
+    if vcrp_capture:
+        intervention_delta = attn_output[:, :, -1:, :] - vcrp_base_last
+        intervention_delta = intervention_delta.transpose(1, 2).contiguous()
+        intervention_delta = intervention_delta.view(bsz, 1, -1)
+        self.vcrp_visual_residual = self.o_proj(intervention_delta)
+
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.view(bsz, q_len, -1)
 
@@ -307,6 +315,7 @@ def replace_attn(
     avhr_tau=1.0,
     avhr_alpha=0.5,
     avhr_rho_max=2.0,
+    vcrp_capture=False,
 ):
     """绑定每一层的 attention forward。
 
@@ -338,6 +347,7 @@ def replace_attn(
                 avhr_tau=avhr_tau,
                 avhr_rho_max=avhr_rho_max,
                 avhr_gamma_l=gamma_l,
+                vcrp_capture=vcrp_capture,
             )
             # 清空可能残留的状态
             layer.self_attn.attn_output_tc = None
@@ -348,6 +358,7 @@ def replace_attn(
             layer.self_attn.vhr_directional_heads = None
             layer.self_attn.vhr_directional_active = False
             layer.self_attn.vhr_phase = None
+            layer.self_attn.vcrp_visual_residual = None
         else:
             layer.self_attn.forward = partial(forward, layer.self_attn)
             layer.self_attn.attn_output_tc = None
@@ -358,6 +369,7 @@ def replace_attn(
             layer.self_attn.vhr_directional_heads = None
             layer.self_attn.vhr_directional_active = False
             layer.self_attn.vhr_phase = None
+            layer.self_attn.vcrp_visual_residual = None
 
 
 def set_directional_active(model, active):

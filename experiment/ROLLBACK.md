@@ -96,3 +96,5 @@ git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-2026
 ```bash
 git switch -c restore/vcrp-preregistered vcrp-mechanism-preregistered-20260717
 ```
+
+VCRP无干预诊断实现、纯函数测试、1图同进程等价烟雾和token/CHAIR对齐分析器检查点为 `vcrp-diagnostic-ready-20260717`。该标签没有运行100图机制gate，也没有启用VCRP intervention。诊断结果目录 `vcrp_smoke_results/` 与 `vcrp_diagnostic_results/` 保持未跟踪。

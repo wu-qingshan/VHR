@@ -109,3 +109,10 @@ VCRP的论文价值不只取决于最低CHAIR：它必须证明单分支、低�
 - 所有结果目录保持untracked；
 - 恢复起点：`rrscvhr-efficiency-quality-20260717`。
 
+## 8. 执行日志
+
+- 2026-07-17：建立独立分支并固定方法公式、机制gate、停止规则和PD dev只读诊断协议；尚未修改模型。
+- 2026-07-17：新增独立 `vcrp.py`，实现FFN到视觉残差半空间的闭式投影、decoder-layer诊断forward和逐token统计聚合；`vhr.py`仅在 `vhr_vcrp_*` flag开启时额外计算VHR intervention residual。
+- 2026-07-17：3项纯函数测试通过：对齐FFN不变、反向分量被最小删除、零视觉残差安全。默认flag关闭。
+- 2026-07-17：PD dev首图同一模型加载依次运行标准VHR与无干预诊断VHR，question ID、text、confidence完全一致。诊断共83个token，每步15个目标层，全部统计finite、zero-visual layer fraction为0。
+- 2026-07-17：首图分析器完成token decode、Treebank word span、CHAIR synonym/node-word和diagnostic step对齐，无对齐失败。该图只有1个CHAIR对象mention，不能用于gate判定；完整100图尚未运行。
