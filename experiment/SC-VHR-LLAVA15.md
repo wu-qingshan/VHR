@@ -123,7 +123,37 @@ LLaVA-1.5 只沿用原论文/项目对该架构的 VHR 层配置；SC-VHR 的对
 
 下一方法假设：当前双边 logit 外推既增强 VHR 偏好的 token，也压低 base 偏好的 token；后者可能误伤部分真实对象。可在新的、未使用图像上预注册 Positive-Delta SC-VHR，只保留 $\max(\ell_{VHR}-\ell_{base},0)$ 的增强项，以测试是否能保留 hallucination reduction 同时恢复总/唯一正确对象覆盖。不得在本次 validation 上调其参数。
 
-## 9. 回滚与输出隔离
+## 9. 三套互斥 LLaVA 划分的 pooled 证据
+
+2026-07-17 增加第三套完全未使用的 100 图，用于 PD-SC-VHR 实验；其中标准 SC-VHR 作为冻结同分布对照。三套图像 ID 完全互斥，总计 300 图。
+
+| 指标 | VHR | 标准 SC-VHR | 变化 |
+|---|---:|---:|---:|
+| CHAIRs ↓ | 38.67 | **28.00** | -10.67 |
+| CHAIRi ↓ | 12.66 | **9.25** | -3.42 |
+| Len | 80.75 | 78.62 | -2.64% |
+| hallucinated mentions ↓ | 265 | **173** | -34.72% |
+| generated mentions | 2093 | 1871 | -10.61% |
+| unique correct objects | 716 | 693 | -3.21% |
+| repeated mentions ↓ | 1181 | **1047** | -11.35% |
+| correct mention rate ↑ | 87.34% | **90.75%** | +3.41pp |
+
+50,000 次逐图 pooled bootstrap（seed 20260717）：
+
+- CHAIRs 差值 -10.67，95% CI `[-15.00,-6.33]`；
+- CHAIRi 差值 -3.42，95% CI `[-4.97,-1.92]`；
+- 转移：修复 39、新增 7、持续幻觉 77、持续正确 177；McNemar exact `p=1.83e-6`；
+- unique correct objects 每图差值 -0.077，95% CI `[-0.140,-0.013]`；
+- hallucinated mentions 每图差值 -0.307，95% CI `[-0.427,-0.193]`；
+- repeated mentions 每图差值 -0.447，95% CI `[-0.670,-0.227]`。
+
+最终跨划分表述应更新为：
+
+> 标准 SC-VHR 在三套互斥 LLaVA-1.5 图像上稳定且显著降低对象幻觉；total mentions 的下降同时包含大量重复与幻觉减少。细粒度语义覆盖并非完全无损：唯一正确对象下降约 3.2%，幅度远小于幻觉 mentions 的 34.7% 降幅，但 pooled 统计已达到显著。
+
+Positive-Delta 消融表明，完全取消对 base 偏好 token 的负向外推会恢复覆盖但同时消除 hallucination benefit。因此后续若继续优化质量-覆盖 Pareto，必须对“何时抑制”做结构化路由，不能简单删除所有负 delta。完整负结果见 `experiment/PD-SC-VHR.md`。
+
+## 10. 回滚与输出隔离
 
 - 核心稳定恢复命令见 `experiment/ROLLBACK.md`。
 - 本阶段使用全新输出目录，不覆盖 `llava15_dev_results/`、`llava15_validation_results/` 或任何 InstructBLIP 正式结果。
