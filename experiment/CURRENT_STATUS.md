@@ -26,6 +26,11 @@ cycle 增加 15.33pp。locked validation/test 未运行。结论是固定 VHR he
 在现代 Qwen 上产生架构级负迁移，下一方向必须以 vanilla/base 为安全锚点做不可逆
 稳定性回退，而不是继续扫描 VHR 参数。
 
+当前新候选为 SRR-SC-VHR：开放描述在 SC 候选首次将形成已冻结 exact cycle 时，
+不可逆回退 vanilla/base cache，并停止后续 VHR forward；binary 继续走 VHR。SRR
+必须在同一 dev 上恢复到接近 vanilla 的幻觉、覆盖和稳定性 Pareto，才允许进入尚未
+查看的 locked validation。协议见 `experiment/SRR-SC-VHR.md`。
+
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
 统一单 GPU、同一次模型加载 benchmark 已完成。两轮正反顺序的全部输出严格等价，轮间时延波动均小于 2%，不触发第三轮：

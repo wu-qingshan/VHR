@@ -125,3 +125,7 @@ Qwen 300 图 dev 的完整负结果、coverage/cycle/runtime/bootstrap 分析和
 `qwen-scvhr-dev-negative-20260717`。locked validation/test 未运行，所有
 `qwen_dev_results/` 保持 untracked。该标签是后续 base-anchored stability rollback
 方法的机制起点，不应从结果目录复制或修改历史输出。
+
+SRR-SC-VHR 的固定 exact-cycle 风险定义、不可逆 base rollback、停止 VHR forward
+规则和严格 dev gate 的预注册标签为 `qwen-srr-preregistered-20260717`。该标签不含
+SRR 实现或结果。
