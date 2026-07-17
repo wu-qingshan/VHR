@@ -3,7 +3,7 @@
 > 日期：2026-07-17
 > 分支：`research/qwen-sear`
 > 起点：`qwen-object-verifier-feasible-20260717`
-> 当前状态：方法预注册；尚未安装 parser、尚未运行 caption 过滤
+> 当前状态：300图dev已完成；幻觉指标通过但语义覆盖门槛失败，按预注册停止，未运行locked validation/test
 
 ## 1. 方法动机
 
@@ -87,3 +87,74 @@ SEAR 把 VHR 的“增强视觉依赖”改写成更直接的假设：只有具�
 
 - 2026-07-17：从 verifier feasible tag 创建独立分支，冻结 parser、stoplist、0.1阈值、
   非生成式句子保留规则和严格dev门槛；尚未安装parser模型、尚未运行SEAR。
+- 2026-07-17：仅在`.venv-qwen`安装`spaCy 3.8.11`与
+  `en_core_web_sm 3.8.0`。首次extraction audit在产生结果前因隔离环境缺少NLTK
+  `punkt_tab`退出；资源随后只安装到`.venv-qwen/nltk_data`，原命令重跑。
+- 2026-07-17：extraction audit通过。300图共720个图内唯一CHAIR lexical mention，
+  捕获672个，recall为**93.33%**；617个唯一图像-对象对捕获581个，recall为
+  94.17%。共5750个root-deduplicated通用候选，平均19.17/图，满足不超过20的门槛。
+- 2026-07-17：发现5个由Qwen异常循环造成的超长noun chunk，最长472词。未根据结果
+  裁剪候选或修改parser；工程smoke确认最长query logits/score有限、重复误差为0，且
+  与封存canonical verifier共享样本的分数误差为0。
+- 2026-07-17：六GPU完成5750/5750通用短语query，严格合并后应用冻结0.1整句删除规则。
+  直接以文件路径调用quick-CHAIR时发生`eval.py`包名遮蔽，评测前退出；改用
+  `python -m eval.quick_chair`运行同一历史评测器，没有修改评测代码。
+
+## 8. Extraction与工程结果
+
+| 项目 | 结果 | 门槛 |
+|---|---:|---:|
+| unique lexical mention recall | **93.33%** | ≥90% |
+| unique image-object recall | 94.17% | 报告 |
+| 平均候选/图 | **19.17** | ≤20 |
+| P95 / 最大候选/图 | 38 / 55 | 报告 |
+| verifier queries | 5750/5750 | 完整 |
+| 平均extraction时延 | 0.0386秒/图 | 报告 |
+
+审计中的CHAIR词表只用于测量捕获率；`queries.json`完全由spaCy noun chunks生成，manifest
+明确记录`chair_vocabulary_used=false`。
+
+## 9. 300图dev正式结果
+
+| 方法 | CHAIRs ↓ | CHAIRi ↓ | Len | unique correct | exact cycles | 512 source hit |
+|---|---:|---:|---:|---:|---:|---:|
+| vanilla | 23.67 | 6.46 | 147.48 | 531 | 50 | 29 |
+| SEAR | **17.00** | **5.69** | 120.05 | 486 | 37 | 29 |
+
+SEAR相对vanilla的CHAIRs差值为**-6.67**，paired bootstrap 95% CI
+`[-9.67,-4.00]`，方向概率为1.0。总pipeline为10.50秒/图，其中verifier+提取+过滤为
+4.62秒/图，低于SC的25.29秒/图。
+
+但核心coverage门槛失败：unique correct objects仅保留
+`486/531=91.53%`，低于预注册95%。170/300图触发删除，共删除311/2459句
+（12.65%）；这些删除只移除28次幻觉object mention，却同时移除243次正确mention；按
+unique object计为23个幻觉对象与45个正确对象。整句删除的主要作用不是精准移除错误，
+而是连带清除同句大量真实内容。
+
+| dev gate | 结果 |
+|---|---|
+| CHAIRs ≤20.67 | 通过 |
+| CHAIRi不差于vanilla | 通过 |
+| unique correct ≥95% vanilla | **失败（91.53%）** |
+| Len为vanilla的0.75–1.05倍 | 通过 |
+| cycle/max-hit不恶化 | 通过 |
+| SEAR-only时延低于SC | 通过 |
+| paired CHAIRs方向为负 | 通过 |
+
+总判定：**失败，停止在dev；不运行locked validation/test，不扫描threshold、stoplist或
+parser规则。**
+
+## 10. 机制结论与下一方向
+
+对象verifier信号本身仍然成立，但“任一低分对象→删除整句”的决策粒度过粗。一句中常
+同时包含一个低分候选和多个真实对象，因此高precision absent threshold仍会造成严重
+语义连带损失。下一候选必须采用新的未使用dev划分，研究phrase/clause级局部修订，并将
+vanilla作为安全锚点；本次300图只能用于确认整句粒度失败，不能继续选择阈值或语法规则。
+
+结果SHA256：
+
+- extraction audit：`6480e461ea90c2dbbd947c0bcf7f22dcc765ee0de1320055bb778f6d218a004b`
+- queries：`9c8577d8117d399247a57b0c6089bc4c505de941c647b62f883cf72252027a20`
+- verifier：`0a864b76712dbcd76f8c33d312496b9cbfddf3d04f5c163f66993d0a4fe7e50c`
+- SEAR captions：`176f9ccd51cbb6553eb912904f21f437acfd508ce194842812cd4ab2f39ec424`
+- analysis：`8a34dd39f56453506ba367425f0493ae4f40315b8238808036bdc34edd324711`

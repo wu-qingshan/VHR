@@ -47,9 +47,12 @@ balanced accuracy 0.795，正负 mean score gap 0.587、95% CI `[0.513,0.658]`�
 目前现代 Qwen 上最可靠的机制信号。下一步实现通用 noun-phrase + 最小证据修订，但
 不能用0.5阈值机械删除整句，因为仍有45个真实对象被判No。
 
-当前效果候选为 SEAR：用通用 spaCy noun chunks 提取对象，只删除包含
-`verifier score<=0.1`高置信不存在对象的句子，其余 vanilla 文本逐字保留。先过通用
-提取 recall/candidate-count gate，再运行效果；协议见 `experiment/QWEN-SEAR.md`。
+SEAR现已完成并按预注册否决。通用spaCy提取recall为93.33%、平均19.17候选/图；300图
+CHAIRs由23.67显著降至17.00，CI为`[-9.67,-4.00]`，但unique correct objects只保留
+91.53%。311个删除句移除28次幻觉mention的同时移除243次正确mention，证明整句删除
+粒度过粗。locked validation/test未运行，也不扫描阈值或stoplist。下一方法必须在新的
+未使用dev上做phrase/clause级局部修订，并保持vanilla主轨迹。详见
+`experiment/QWEN-SEAR.md`。
 
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 

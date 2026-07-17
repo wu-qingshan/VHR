@@ -154,3 +154,8 @@ Qwen 对象 Yes/No logit verifier 的固定 prompt、token ids、全300图 query
 SEAR 的 spaCy 通用 noun-chunk、固定 stoplist、score≤0.1、高置信句子删除和严格dev
 门槛预注册标签为 `qwen-sear-preregistered-20260717`。该标签不含 parser模型、实现或
 过滤结果。
+
+SEAR extraction工程、5750-query verifier、300图dev负结果与严格停止决定的检查点标签为
+`qwen-sear-dev-negative-20260717`。结果目录`qwen_sear_dev_results/`保持untracked；
+locked Qwen validation/test从未读取。核心结果为CHAIRs 23.67→17.00，但unique correct
+objects仅保留91.53%，因此否决整句删除并转向新的phrase/clause级方法。
