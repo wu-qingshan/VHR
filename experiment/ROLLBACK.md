@@ -67,3 +67,5 @@ DG-SC-VHR 预注册实现与成功烟雾测试的检查点标签为 `dgscvhr-pre
 DG dev 负结果与机制结论的检查点标签为 `dgscvhr-dev-negative-20260717`。锁定 validation 未运行。
 
 标准 SC token-switch 诊断实现与一图逐字等价验证的检查点标签为 `scvhr-switch-diagnostic-ready-20260717`。
+
+100 图逐字等价诊断与 VEG 下一方向结论的检查点标签为 `scvhr-switch-diagnostic-complete-20260717`。

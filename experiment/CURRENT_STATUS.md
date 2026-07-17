@@ -20,6 +20,8 @@ CHAIRs/CHAIRi 两套均显著改善且长度稳定，但 total generated mention
 
 Disagreement-Gated SC-VHR 只在 VHR/base argmax 不一致时使用 contrast。新 dev 上实际仅 11.46% token 步触发；unique correct 224→224、mentions 保留 97.8%，但 CHAIRs 39→38（CI `[-5,3]`），远差于标准 SC 的 28。它只显著改善 CHAIRi 到 10.06，因此否决且不运行 validation。结论是标准 SC 的关键收益大量来自“两分支 argmax 相同、外推后第三 token 上升”的步骤，简单二元路由不足。
 
+随后对标准 SC 进行 100 图逐 token 诊断重跑，并与历史输出 100/100 逐字等价。9955 步中 branch argmax 分歧占 11.40%，但标准 SC 实际 switch 只有 5.87%；584 次 switch 中 508 次（86.99%）发生在两分支 argmax 原本相同的步骤。修复与持续幻觉在 switch rate、selected delta、score margin 上没有可用于可靠阈值的显著分离。因此停止两分支标量 gate 扫描，下一候选转向引入在线 text-only 视觉证据的 VEG-SC-VHR。
+
 ## 已放弃的第一候选：DC-VHR
 
 暂定名称：Direction-Calibrated VHR（DC-VHR）。
