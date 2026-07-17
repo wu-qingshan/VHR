@@ -27,8 +27,10 @@ VERA-VHR（Verified Evidence-Routed Amendment with VHR）不沿VHR轨迹生成�
 1. 使用Qwen2.5-VL-7B-Instruct原生vanilla生成完整caption；
 2. 使用SEAR已冻结的`spaCy 3.8.11 + en_core_web_sm 3.8.0`、determiner规则和stoplist
    提取noun chunks；
-3. 使用完全冻结的Yes/No verifier prompt、token ids和score；
-4. 一个句子只在任一候选`score<=0.1`时触发局部修订；同句所有低分phrase一次性列入，
+3. 在进入visual query前应用固定输入合法性：root lemma与phrase必须都至少包含一个ASCII
+   英文字母；该规则只排除Markdown `*`等非词汇parser artifact，不使用CHAIR或图像标签；
+4. 使用完全冻结的Yes/No verifier prompt、token ids和score；
+5. 一个句子只在任一候选`score<=0.1`时触发局部修订；同句所有低分phrase一次性列入，
    不逐phrase多轮修改。
 
 ### 2.2 固定修订prompt
@@ -151,3 +153,7 @@ AMBER/MMHal/HallusionBench、POPE、MME/MMBench和近期强基线。
 - dev：`fa4234988eccb3588ee0b3e27e9005f6ce4507a6e2c16dea55fc380696a63ddf`
 - validation：`d8e892cf1036ebfea84c1efb6f264599b3016e1341de018c949ccbd4aa053636`
 - test：`bc13b91dde4757d82d7aa63627fef941cebc86eedaa3d49f382ec0c3157d410a`
+- 2026-07-17：首次旧dev工程smoke发现spaCy把Markdown标题`**Bed**`中的`*`解析为
+  noun root，导致无意义低分触发；此时新VERA dev尚未运行。旧开放数据316个初始任务中
+  12个含非ASCII词汇root。加入上述通用input-validity规则并形成v2预注册；不依据CHAIR
+  错误、效果指标或locked数据修改，原v1 tag保留审计。

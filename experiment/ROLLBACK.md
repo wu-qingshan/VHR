@@ -167,3 +167,7 @@ VERA-VHR 的vanilla安全锚点、证据触发局部修订、base/VHR双候选�
 排除4446个历史/保留ID后的VERA 300/500/500互斥划分标签为
 `qwen-vera-dev-split-20260717`。该标签包含split与完整manifest；三个新集合均尚未运行，
 并与原Qwen dev/validation/test完全无重叠。
+
+旧dev工程smoke发现Markdown `*`被spaCy误识别为noun root后、在任何新VERA dev运行前，
+加入“root与phrase必须含ASCII英文字母”的通用输入合法性规则。修订预注册标签为
+`qwen-vera-preregistered-v2-20260717`；v1 tag保留且不得用于效果主张。
