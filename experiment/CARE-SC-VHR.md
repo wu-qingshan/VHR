@@ -180,3 +180,4 @@ VEG、PD、DG 已有冻结负结果，不在新划分上重复调参。正式论
 - 2026-07-17：LLaVA CARE dev 首图 `33532` 的 VHR/SC/CA/CARE 四方法烟雾全部成功。CA 与 CARE 文本一致，aligned plausible token fraction=51.38%，其中负向对齐占67.69%，保留约50.24%的 intervention absolute delta；本样本未触发 cycle guard。
 - 2026-07-17：用旧 VEG runner 重新生成同一图的 VHR/SC 控制输出，`question_id/text/gt/ans_conf/question` 与 CARE runner 逐字段一致，证明新 flags 未污染标准路径。
 - 2026-07-17：POPE popular 前10题 binary smoke 中，CARE 与 VHR 10/10 的 ID、文本、标签、confidence、问题逐字段一致；route 全为 `vhr`，没有建立 CARE 诊断字段。
+- 2026-07-17：新增冻结 dev evaluator `scripts/evaluate_care_dev.py`，在结果完成后一次性计算 CHAIR、对象覆盖、distinct、重复、cycle、配对 bootstrap/McNemar 和全部预注册 gate；输出拒绝覆盖，避免手工选择统计口径。
