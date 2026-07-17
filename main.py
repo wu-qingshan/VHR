@@ -158,6 +158,7 @@ class HallucinationTest:
                 generate_kwargs.update(
                     {
                         "vhr_base_contrast": True,
+                        "vhr_positive_delta_contrast": "pdscvhr" in self.method,
                         "vhr_logit_alpha": self.vhr_logit_alpha,
                         "vhr_logit_beta": self.vhr_logit_beta,
                     }

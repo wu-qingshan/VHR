@@ -44,3 +44,16 @@ git restore --source scvhr-instructblip-stable-20260716 -- main.py generation.py
 ```bash
 git switch -c restore/scvhr-llava15 scvhr-llava15-crossval-20260716
 ```
+
+## PD-SC-VHR 预注册实现检查点
+
+- 标签：`pdscvhr-preregistered-20260717`
+- 分支：`research/pd-scvhr`
+- 内容：全新未使用 dev/validation IDs、预注册门槛、Positive-Delta 独立 generation flag、单次加载 runner 和成功烟雾测试记录。
+- 不包含生成结果；`pdscvhr_*_results/` 始终保持未跟踪。
+
+恢复命令：
+
+```bash
+git switch -c restore/pdscvhr-preregistered pdscvhr-preregistered-20260717
+```

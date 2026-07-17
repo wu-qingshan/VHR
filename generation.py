@@ -23,6 +23,14 @@ GenerationMode.OPERA_GENERATION = "opera_generation"
 GenerationMode.CODE_GENERATION = "code_generation"
 
 
+def compute_contrasted_logits(primary_logits, contrast_logits, alpha, positive_delta=False):
+    """Apply standard two-sided or positive-delta-only logit extrapolation."""
+    delta = primary_logits - contrast_logits
+    if positive_delta:
+        delta = torch.clamp_min(delta, 0.0)
+    return primary_logits + alpha * delta
+
+
 def _vhr_decoding(
     self,
     input_ids: torch.LongTensor,
@@ -214,8 +222,13 @@ def _vhr_decoding(
             contrast_alpha = generation_config.cd_alpha if use_vcd else generation_config.vhr_logit_alpha
             contrast_beta = generation_config.cd_beta if use_vcd else generation_config.vhr_logit_beta
             cutoff = math.log(contrast_beta) + next_token_logits.max(dim=-1, keepdim=True).values
-            contrasted_logits = (
-                (1 + contrast_alpha) * next_token_logits - contrast_alpha * next_token_logits_cd
+            contrasted_logits = compute_contrasted_logits(
+                next_token_logits,
+                next_token_logits_cd,
+                contrast_alpha,
+                positive_delta=(
+                    use_base_contrast and generation_config.vhr_positive_delta_contrast
+                ),
             )
             contrasted_logits = contrasted_logits.masked_fill(next_token_logits < cutoff, -float("inf"))
             next_token_scores = logits_processor(input_ids, contrasted_logits)
@@ -1872,6 +1885,7 @@ def generation_config_init(self, **kwargs):
     self.vhr_image_end = kwargs.pop("vhr_image_end", None)
     self.vhr_images_noisy = kwargs.pop("vhr_images_noisy", None)
     self.vhr_base_contrast = kwargs.pop("vhr_base_contrast", False)
+    self.vhr_positive_delta_contrast = kwargs.pop("vhr_positive_delta_contrast", False)
     self.vhr_logit_alpha = kwargs.pop("vhr_logit_alpha", 0.5)
     self.vhr_logit_beta = kwargs.pop("vhr_logit_beta", 0.1)
     # A-VHR (Adaptive-ratio VHR) hyper-parameters
