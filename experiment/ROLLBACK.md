@@ -88,3 +88,11 @@ RR-SC-VHR 统一效率、COCO caption quality、重复/循环诊断和可复现�
 ```bash
 git switch -c restore/rrscvhr-efficiency-quality rrscvhr-efficiency-quality-20260717
 ```
+
+## VCRP-VHR机制预注册检查点
+
+视觉一致残差投影的纯设计、机制gate和停止规则检查点为 `vcrp-mechanism-preregistered-20260717`。该标签尚不包含decoder-layer修改、诊断输出或效果实验。VCRP从RR稳定标签建立独立分支，不携带SAVER空间诊断实现。
+
+```bash
+git switch -c restore/vcrp-preregistered vcrp-mechanism-preregistered-20260717
+```
