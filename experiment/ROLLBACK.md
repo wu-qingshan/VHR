@@ -180,3 +180,10 @@ locked集合尚未运行。
 VERA固定dev分析器与baseline/source-query/revision/candidate-query/materialization完整
 执行接口冻结后的标签为`qwen-vera-dev-runner-ready-20260717`。该标签固定所有效果、
 coverage、CI、效率和接受率门槛；不含完整dev结果。
+
+VERA新300图dev、完整门槛分析、事后trigger/CHAIR对齐诊断和严格停止决定的检查点标签为
+`qwen-vera-dev-negative-20260718`。完整VERA保持vanilla的全部unique correct objects，
+但CHAIRs仅28.33→28.00，paired 95% CI `[-1.67,0.67]`，未过预注册效果门槛。
+locked validation/test从未运行；`qwen_vera_dev_results/`继续保持untracked。该标签可用于
+复现代码、split、manifest、诊断逻辑和实验结论，但不包含生成结果。后续方法必须使用
+新的开发集研究mention级视觉蕴含或区域grounding，不得回看当前dev扫描VERA参数。

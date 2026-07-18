@@ -1,9 +1,9 @@
 # VERA-VHR：视觉证据路由的局部修订
 
-> 日期：2026-07-17
+> 日期：2026-07-18
 > 分支：`research/qwen-vera`
 > 起点：`qwen-sear-dev-negative-20260717`
-> 当前状态：实现与旧开放数据工程smoke通过；新300图dev尚未运行
+> 当前状态：新300图dev未过预注册效果门槛；按协议停止于locked validation之前
 
 ## 1. 研究动机
 
@@ -180,3 +180,73 @@ AMBER/MMHal/HallusionBench、POPE、MME/MMBench和近期强基线。
 - 10-task revisions：`93af08fd7993e0e6087f778fa9a14da944aab217ee6e5b091514570f73b9e8f8`
 - candidate verifier：`8d876a0c8c4d2708629de8f5ea91c7e7e6388db0c8aefbe050a33b1dfe7e3eea`
 - VERA smoke outputs：`4699246c45cab3a78b6f71f3047097318b47e13103e0650d43ba799b5e279615`
+
+### 7.1 新dev正式运行
+
+- 2026-07-18：严格运行全新300图dev。baseline 300/300全部完成并按预注册manifest
+  合并；source verifier产生5964个query，形成336个触发句、覆盖187图，平均每句3.13个
+  protected roots。base/VHR共生成672个修订候选，候选二次验证产生2969个query。
+- 完整VERA接受97/336个修订（28.87%）：base 64、VHR 33；其余239句逐字fallback。
+  base-only接受71句，VHR-only接受46句。
+
+| 方法 | CHAIRs | CHAIRi | Len | unique correct | exact cycle | 秒/图 |
+|---|---:|---:|---:|---:|---:|---:|
+| vanilla | 28.33 | 8.31 | 153.85 | 557 | 51 | 6.27 |
+| VHR | 34.67 | 6.79 | 311.34 | 573 | 171 | 11.57 |
+| SC-VHR | 28.00 | 12.53 | 364.51 | 523 | 246 | 26.54 |
+| base-only revision | 27.67 | 8.13 | 152.97 | 558 | 50 | 13.38 |
+| VHR-only revision | 28.67 | 8.30 | 153.30 | 557 | 50 | 13.74 |
+| VERA-VHR | 28.00 | 8.12 | 152.68 | 557 | 50 | 16.16 |
+| SEAR sentence diagnostic | 20.67 | 7.13 | 125.23 | 521 | 41 | 10.96 |
+
+VHR的CHAIRi数值低于vanilla不能解释为改善：其平均长度翻倍，generated mentions从1552
+增至3034，绝对幻觉mention从129增至206，CHAIRs也恶化6.34点。SC同样出现严重长度、
+cycle与绝对幻觉mention退化。
+
+完整VERA相对vanilla：CHAIRs仅下降0.33点，paired bootstrap 95% CI
+`[-1.67,0.67]`，方向为负的bootstrap概率为0.611；CHAIRi下降0.19点，unique correct
+保持557/557，长度为99.24%，cycle为50对51。对象审计显示移除4次幻觉mention但引入
+1次；正确对象mention移除9次、增加11次，unique correct净保持。总时延16.16秒/图，
+低于SC的26.54秒/图。
+
+预注册门槛中，CHAIRs至少下降3点和paired CI上界不大于0两项失败；CHAIRi、coverage、
+长度、cycle、512-hit、时延和接受率门槛通过。固定判定为`stop_before_validation`。
+因此不运行locked validation/test，也不扫描0.1/0.5阈值、prompt、protected规则、长度
+范围、候选排序或VHR配置。
+
+正式结果SHA256：
+
+- 完整dev分析：`cd626d1d92b6d0f5c046ccff02f4bef1b6fdaf84f9a0ee4d7a5d727aa4385810`
+- VERA物化输出：`99044cddcfbbf7467c6157f25a92f95df7c4fd1f9f9e198d1476b7e897bbac2e`
+- candidate verifier：`a90c6f9fbace8426d10220a8020b0c64c3f3cc1006cc146e1ee59aa5f3a2d197`
+
+### 7.2 失败机制诊断（只解释，不调当前dev）
+
+使用固定CHAIR evaluator对触发、接受与目标幻觉做事后对齐审计：
+
+- 336个触发句中只有39句（11.61%）包含CHAIR定义的幻觉对象；
+- trigger root与CHAIR hallucinated root直接匹配仅11/336（3.27%）；
+- 97个接受修订中只有6个源句包含CHAIR幻觉，其中完整修复4个；
+- 33个真正含CHAIR幻觉的触发句最终fallback；
+- 另有1个原本无CHAIR幻觉的接受修订引入新幻觉；
+- 33个VHR候选被完整策略选中，但VHR-only整体令CHAIRs相对vanilla恶化0.33点。
+
+这说明当前瓶颈不是“verifier完全没有视觉信号”，而是**通用低分noun chunk与目标对象
+幻觉严重错位**。低分信号大量落在抽象词、属性、非CHAIR实体或错误短语边界；严格
+protected-root接受器成功保护覆盖，却使多数真正含幻觉的句子fallback。局部rewrite只能
+修复已经正确定位的少数对象，VHR proposal本身也没有提供稳定的额外增益。
+
+对齐诊断明确写入`posthoc_explanation_only=true`和`must_not_tune_current_dev=true`；
+其SHA256为`951c058aaed4c39aa8fe48a9216e81bfd6228dc37226e111410b46abb109bdcd`。
+
+## 8. 阶段结论与下一方向
+
+VERA-VHR证明“vanilla安全锚点 + 严格局部接受”能避免SEAR的覆盖崩塌，也能避免全局
+VHR/SC在Qwen上的生成退化，但当前通用对象触发器的目标对齐率不足，无法形成有统计
+意义的CHAIR提升。该方法作为安全但弱效的负结果封存，不进入locked集合。
+
+下一阶段不应继续扫描rewrite prompt或VHR候选，而应在全新开发集预注册**mention级视觉
+蕴含/grounding**：先把caption中的实体mention与图像区域或开放词汇检测结果对齐，再只对
+“明确实体 + 明确负视觉证据”的mention做删除、替换或受约束重生成。核心门槛应同时约束
+目标对齐precision/recall、CHAIR、coverage与校准；VHR最多作为消融proposal，不再作为
+默认有效分支。

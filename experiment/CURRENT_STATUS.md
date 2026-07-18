@@ -1,6 +1,6 @@
 # VHR 改进当前研究状态
 
-> 更新时间：2026-07-17
+> 更新时间：2026-07-18
 > 详细全过程见 `experiment/CS-VHR.md`；原项目诊断见 `EXPERIMENT_DIAGNOSIS.md`。
 
 ## 当前执行阶段：Qwen2.5-VL 现代主干迁移
@@ -54,12 +54,18 @@ CHAIRs由23.67显著降至17.00，CI为`[-9.67,-4.00]`，但unique correct objec
 未使用dev上做phrase/clause级局部修订，并保持vanilla主轨迹。详见
 `experiment/QWEN-SEAR.md`。
 
-当前候选为VERA-VHR：vanilla生成主轨迹，只有冻结verifier发现`score<=0.1`对象时才对
-局部句子生成base与VHR两个修订候选；候选必须通过二次视觉验证并保留全部高置信
-protected object roots，否则逐字回退原句。已创建排除4446个历史/保留ID的全新
-300/500/500划分，原Qwen locked集合继续封存。旧开放数据工程smoke已通过：HF/base与
-ratio=1逐token等价，顺序/重复确定；前10个触发句完整链路接受3个（base 2、VHR 1）。
-新dev尚未运行。协议见`experiment/QWEN-VERA-VHR.md`。
+VERA-VHR新300图dev现已完成并按预注册停止。vanilla/base-only/VHR-only/完整VERA的
+CHAIRs为28.33/27.67/28.67/28.00；完整VERA的CHAIRs差值仅-0.33，95% CI
+`[-1.67,0.67]`，未达到至少-3且CI上界不大于0的门槛。它保持100% unique correct，
+长度、cycle、512-hit、接受率和低于SC的时延均合格，说明安全接受机制有效，但目标效果
+不足。locked validation/test未运行，当前dev不扫描任何阈值、prompt或VHR配置。
+
+事后对齐诊断定位了失败机制：336个触发句只有39个含CHAIR幻觉，trigger root与目标
+幻觉直接匹配仅11个；97个接受修订中仅6个来自含幻觉源句，修复4个、引入1个，另有
+33个真正含幻觉的触发句fallback。结论是通用低分noun chunk没有对齐目标mention，严格
+接受器虽保护覆盖，却无法修复多数目标幻觉。下一主方向转为全新开发集上的mention级
+视觉蕴含/区域grounding；VHR只保留为proposal消融。详见
+`experiment/QWEN-VERA-VHR.md`。
 
 ## 最新结论：RR-SC-VHR 效率成立，但暴露生成稳定性代价
 
