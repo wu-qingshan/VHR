@@ -183,3 +183,13 @@ E0.3 无淘汰门槛（工程 smoke）：确定性（第 4 项）与 rope 泄漏
 
 - 2026-09-04：自 `qwen-vera-dev-negative-20260718` 创建 `research/qwen-mgr`；
   冻结本预注册。尚未创建任何 E0.1/E0.2/E0.3 代码或输出。
+- 2026-09-05（E0.3 解析契约修正，v2）：首轮 grounding smoke 完成后发现冻结
+  prompt `Point to the {phrase} in the image.` 下，本地
+  Qwen2.5-VL-7B-Instruct + transformers 4.45.2 输出 JSON 风格
+  `"bbox_2d": [x1,y1,x2,y2]`（绝对像素，与预注册坐标约定一致）或
+  `point_2d`/<points> 点输出，而非 `<ref>…</ref><box>…</box>` 标签。第 3.1 节
+  解析规则据此修正为：按原顺序尝试 `<box>[[…]]</box>` 与首个
+  `"bbox_2d": […]` JSON 数组；仅含点输出的 mention 记为 ungrounded
+  （原因 `point_only`）。prompt、坐标约定、有效性规则、IoU 与工程门槛数值均
+  不变。本修正只影响解析层，发生在任何效果结论之前；首轮仅 `<box>` 解析的
+  分析留档为 `e03_analysis_v1_boxparser.json`。
