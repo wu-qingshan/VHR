@@ -90,6 +90,8 @@ def test_crop_box():
     assert crop == [0, 0, 640, 480]
     crop, reason = crop_box([10.0, 10.0, 10.5, 10.5], 640, 480)
     assert crop is None and reason == "degenerate_box"
+    crop, reason = crop_box([100, 100, 115, 125], 640, 480)
+    assert crop is None and reason == "degenerate_box"
     crop, reason = crop_box([600, 400, 700, 500], 640, 480)
     assert crop == [590, 390, 640, 480] and reason is None
 

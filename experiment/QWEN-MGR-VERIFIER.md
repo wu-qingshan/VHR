@@ -183,3 +183,41 @@ node words：
 
 - 2026-09-05：冻结本预注册。此时未编写 `qwen_mgr.py` 或任何 runner，未运行任何
   自列/grounding/区域 query。GroundingDINO/OWLv2 可得性检查完成（不可用，离线）。
+- 2026-09-06（裁剪下界工程修正，v2）：首个区域 query 即触发
+  `smart_resize` 硬约束：输入图像两边均须 ≥ 28 px（factor=28），预注册第 3.3 节
+  的"任一边 < 2 px → ungrounded"在 2–28 px 区间物理上无法送入 processor。修正：
+  `MIN_CROP_SIDE` 由 2 提为 28，原因仍记 `degenerate_box`；margin 外扩与 clamp
+  规则、其余全部定义不变。该修正在看到任何效果数据之前、由工程约束强制发生。
+  整图 verifier（1749 新 query）已在此修正前完成，不受影响。
+- 2026-09-06（阶段 1 feasibility 数据完成，正式判定待 E0.2）：
+  - 工程：selflist 600 图完成（对齐 4295 mention、未对齐率 34.3%、31 个空 caption）；
+    union inventory 11,986 query（整图分数复用 10,237、新跑 1,749）；
+    grounding+区域 verifier 全量 11,986/11,986 完成，chunk1 双进程产生 2,756 条
+    重复行，全部仅时延字段不同、结果字段逐字一致（确定性成立）；
+    verifier 泄漏检查通过；级联口径成本 6.17 秒/图（≤8 达标），加自列生成约
+    8.1 秒/图。
+  - 首轮指标（分析器在无 E0.2 标注时按预注册抑制门槛判定）：
+
+    | inventory | P_chair | recall | AUC(s) | AUC(s_whole) | 幻觉 mention | H_cov |
+    |---|---:|---:|---:|---:|---:|---:|
+    | branch_S | 0.714 | 0.103 | 0.776 | 0.771 | 97 | 0.047 |
+    | branch_U | 0.565 | 0.185 | 0.773 | 0.767 | 189 | 0.166 |
+    | selflist_only | 0.714 | 0.112 | 0.781 | 0.774 | 89 | 0.047 |
+    | spacy_only | 0.507 | 0.188 | 0.750 | 0.750 | 186 | 0.171 |
+
+  - 门槛预测：G2（P≥0.5）与 G5（成本）通过；G1（幻觉 mention 189<200，且
+    branch_S 仅 97）、G3（recall 0.185≪0.6）、G4（AUC 0.773<0.85）失败。
+    两分支结论一致，**判定结果不依赖 E0.2 的分支选择**；正式 negative tag 在
+    E0.2 标注完成、分析器输出判定后冻结。
+  - 失败机制（`mgr_verifier_results/score_diagnosis.json`，explanation-only）：
+    幻觉 mention 的 `s_whole` 中位数 0.818，86/189 > 0.9（正确 mention 中位
+    0.993）；组合分数只把触发内的幻觉捕获从 40 降到 35（region 证据几乎无增量，
+    AUC +0.005）。即**同模型 verifier 系统性继承生成轨迹的幻觉信念**，且区域
+    verifier 同样如此（幻觉 mention 的 region 分数 0.85–0.99）。object-evidence
+    阶段的 AUC 0.926 是固定对象清单上的信号，不迁移到"模型自己幻觉出的对象"。
+    触发精度问题（VERA 失败点）确已被提取 v2 修复，但召回瓶颈转移到了证据源
+    本身。E0.3 观察到的 "There are none." 拒绝形态是少数例外（point_only 率
+    38–49%，多数幻觉 mention 仍得到高置信框或点）。
+  - 按第 5 节停止规则：不扫 prompt/阈值/margin/规则；阶段 2 取消，进入
+    "转方案 B 或回阶段 0 重新评估（需新决策文档）"的分叉，等待本人对 E0.2 的
+    标注与后续方向决策。

@@ -27,7 +27,7 @@ DETERMINERS = ("a", "an", "the", "this", "that", "these", "those")
 MAX_ITEMS = 40
 MAX_ITEM_WORDS = 8
 CROP_MARGIN = 0.10
-MIN_CROP_SIDE = 2
+MIN_CROP_SIDE = 28  # Qwen2.5-VL smart_resize requires both sides >= 28 px
 TRIGGER_THRESHOLD = 0.1
 SELFLIST_MAX_NEW_TOKENS = 160
 GROUNDING_MAX_NEW_TOKENS = 64
