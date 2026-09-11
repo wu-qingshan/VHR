@@ -221,3 +221,48 @@ node words：
   - 按第 5 节停止规则：不扫 prompt/阈值/margin/规则；阶段 2 取消，进入
     "转方案 B 或回阶段 0 重新评估（需新决策文档）"的分叉，等待本人对 E0.2 的
     标注与后续方向决策。
+- 2026-09-11（E0.2 标注完成，正式判定冻结）：
+  - E0.2 人工标注 38/38 完成：真幻觉 6、真实物体误触发 9、非实体词误触发 23。
+    **noun-chunk 触发人工 precision = 6/38 = 0.158 < 0.3** → 按预注册分支规则，
+    主 inventory 为 branch_S（模型自列实体为主方案）。84.2% 触发为误报
+    （60.5% 非实体词 + 23.7% 真实物体），独立人工证据确认 VERA 触发错位诊断。
+  - 正式门槛判定（branch_S）：
+
+    | 门槛 | 数值 | 要求 | 判定 |
+    |---|---|---|---|
+    | G1 样本量 | 有标签 1037 / 幻觉 97 | ≥1500 / ≥200 | **失败** |
+    | G2 precision_chair | 0.714 | ≥0.5 | 通过 |
+    | G3 recall | 0.103 | ≥0.6 | **失败** |
+    | G4 ROC-AUC | 0.776 | ≥0.85 | **失败** |
+    | G5 verifier 成本 | 6.17 秒/图 | ≤8 秒/图 | 通过 |
+
+  - **判定：`mgr-verifier-negative`。** 停止，不扫描任何 prompt/阈值/margin/
+    集成规则；阶段 2（MGR 完整方法）取消。失败机制维持 2026-09-06 诊断：
+    同模型 verifier 对幻觉 mention 的中位打分 0.818（86/189 > 0.9），区域证据
+    无增量；提取 v2 已修复触发精度（G2 通过、P_chair 0.714 对比 VERA 期的
+    11.6% 句级命中），但证据源继承生成轨迹幻觉信念，召回与排序均不可达门槛。
+  - 关键工件 SHA256：
+
+    | 文件 | SHA256 |
+    |---|---|
+    | analysis.json（正式判定） | `97884512…2bec2` |
+    | e02_annotation_form.csv（人工标注） | `c0862092…f1836` |
+    | inventory.json | `8c6e643c…f3c012` |
+    | whole_queries.json | `75348f58…53df4b8` |
+    | whole-verifier-chunk00.jsonl | `34345c97…8c8cd10` |
+    | region-chunk00.jsonl | `4c8334a7…c81e9e8` |
+    | region-chunk01.jsonl | `243fd21c…796b2a8` |
+    | region-chunk02.jsonl | `4c4635b9…0688c5c` |
+    | region-chunk03.jsonl | `ec3b0795…dfdb076b` |
+    | selflist-old.jsonl | `26f43645…b53618ed` |
+    | selflist-vera.jsonl | `e00adf81…6e3aff2` |
+    | score_diagnosis.json | `3fa2bc57…2fbbcff8` |
+    | engineering_smoke.json | `01bb064e…b2515fab` |
+
+## 8. 阶段结论
+
+MGR 的"同模型组合证据"前提在 mention 级不成立：触发对齐问题已由实体级提取
+解决（G2 通过），但 Yes/No logit verifier 与 grounding 区域验证都会继承生成
+轨迹对幻觉对象的置信，任何同模型证据组合的召回上限（实测 recall 0.10–0.19、
+AUC ≤0.78）远离门槛。阶段 1 按预注册判负封存；后续走 nextplan 停止规则分叉
+（方案 B 审计论文，或新决策文档评估跨模型/外部证据源），由本人决策。
