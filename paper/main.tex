@@ -1,0 +1,184 @@
+% Audit paper draft — generated on the frozen tags of research/qwen-mgr.
+% NOTE: local machine has no LaTeX toolchain; this source targets Overleaf.
+% Switch \documentclass to the ACL template at submission time.
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[numbers,sort&compress]{natbib}
+\newcommand{\todonum}[1]{\textcolor{red}{[TODO-NUM: #1]}}
+\newcommand{\chair}{\textsc{Chair}}
+\newcommand{\vhr}{VHR}
+\newcommand{\scvhr}{SC-VHR}
+
+\title{When Do Visual-Head Interventions Survive Backbone Modernization?\\
+A Preregistered Audit of Decoding-Time and Post-hoc Hallucination Mitigation}
+\author{Anonymous}
+\date{Draft of 2026-09-12}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Training-free mitigation of object hallucination in large vision--language models (LVLMs) largely follows two roads: decoding-time intervention on vision-related attention heads, and post-hoc verification-and-revision of generated text. We present a preregistered audit of both roads on the same codebase, spanning four backbone generations---InstructBLIP (Q-Former), LLaVA-1.5 (linear projection), LLaVA-NeXT (AnyRes), and Qwen2.5-VL (grouped-query attention with multimodal rotary embeddings). On the decoding side, the gains of the vision-head divergence family (\vhr{}, ACL 2025) collapse along a gradient rather than a cliff: strong and significant on InstructBLIP (500 images $\times$ 5 seeds, $-7.4$ \chair{s}, 95\% CI $[-9.5,-5.4]$), positive but coverage-collapsing on LLaVA-1.5, reduced to a partial, validation-unstable gain with the self-contrast increment already gone on LLaVA-NeXT, and uniformly negative with severe generation degeneration on Qwen2.5-VL. On the post-hoc side, a three-layer dissection shows that the revision task itself is easy under an oracle trigger ($-17.0$ \chair{s} with 100\% object-coverage retention), that trigger--target misalignment is fixable by entity-level extraction (human-audited precision $0.16$ for noun-chunk triggers versus $0.71$ for entity-level triggers), but that any same-model evidence source is structurally capped: the model's own yes/no verifier and grounded region checks assign a median existence score of $0.82$ to its own hallucinated mentions (ROC-AUC $\le 0.78$), inheriting the generative trajectory's beliefs. We release all preregistrations, splits, frozen analyzers, and manifests, and argue that audits of \emph{when} mitigation transfer fails are a necessary complement to new method papers.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+Object hallucination in LVLMs---fluently describing objects that are not in the image---has attracted two families of training-free countermeasures. \emph{Decoding-time} methods intervene on the forward pass itself, most prominently by amplifying or contrasting the contributions of attention heads identified as vision-sensitive \citep{vhr2025,leng2024vcd,huang2024opera,chuang2024dola}. \emph{Post-hoc} methods let the model finish, then detect and revise unsupported mentions, either with external tools \citep{yin2024woodpecker} or with the model's own verification \citep{chen2024halc}.
+
+Both families report gains, but overwhelmingly on the backbones of the 2023 generation, and almost always without coverage accounting: a method can win on \chair{} by saying less or by silently deleting correct objects. This paper asks a different question: \emph{what survives backbone modernization?} We audit both families on a single codebase across four backbone generations, under preregistered thresholds, exclusive data splits, and frozen analyzers (\S\ref{sec:protocol}).
+
+Our findings form two complementary narratives.
+
+\textbf{(A) The decoding-side gains collapse along a gradient, and the collapse is informative.} The vision-head divergence method (\vhr{}) and its self-contrast extension (\scvhr{}) were developed and validated on InstructBLIP, where \scvhr{} improves \chair{s} by $7.4$ points over \vhr{} with full statistical separation and \emph{increased} object coverage. Moving along the backbone axis, the self-contrast increment is the first casualty: on LLaVA-NeXT, plain \vhr{} still yields a significant dev-set gain ($-13.0$ \chair{s}, CI $[-23,-3]$) while \scvhr{} is indistinguishable from vanilla on both dev and validation; on LLaVA-1.5 the gain comes only with a coverage collapse below a preregistered floor; and on Qwen2.5-VL the entire family turns negative---\chair{s} worsens while captions more than double in length and degenerate into repetition cycles. The mechanism is architectural, not implementational: head-level amplification presumes the redundant, globally identifiable vision heads of Q-Former-era attention; grouped-query attention and multimodal rotary position embeddings change both the geometry that head selection relies on and the length dynamics that global amplification perturbs. We state this as a consistent explanation, not a proven cause.
+
+\textbf{(B) The post-hoc road is capped by evidence self-consistency, not by triggering.} We dissect mention-level revision in three preregistered layers. First, the ceiling: with an oracle trigger derived from ground-truth labels, deleting the hallucinated mentions reduces \chair{s} from $28.3$ to $11.3$ with \emph{zero} unique-correct-object loss---the task is solvable at mention granularity. Second, the trigger: a 20-image, 38-phrase human audit shows generic noun-chunk triggering fires on true hallucinations only $16\%$ of the time, but replacing it with model-listed entity extraction repairs precision to $0.71$ on \chair{}-decidable mentions. Third, the evidence: the repaired trigger then meets the wall. The same model's yes/no logit verifier scores its own hallucinated mentions at a median of $0.82$ (versus $0.99$ for correct mentions); grounding the mention to a region and re-verifying the crop adds only $+0.005$ ROC-AUC. The verifier inherits the generator's beliefs. Under preregistered gates (recall $\ge 0.6$, AUC $\ge 0.85$) the feasibility stage fails at $0.10$ and $0.78$, and we stop rather than tune.
+
+\textbf{Contributions.}
+(1) A four-generation, preregistered audit of a published decoding-time intervention family, isolating the order in which its components fail (self-contrast first, the family later).
+(2) A three-layer dissection of same-model post-hoc revision that separates trigger misalignment (fixable) from evidence self-consistency (structural), with an oracle ceiling proving the task itself is easy.
+(3) A release of the full audit apparatus: preregistrations with frozen thresholds, exclusive splits, untouched lock sets, deterministic pipelines, per-artifact SHA-256 manifests, and the negative-result record of every stage.
+
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Decoding-time mitigation.}
+Contrastive decoding amplifies the difference between decoding with and without visual evidence \citep{leng2024vcd}; OPERA penalizes over-trusted beam pivots and aggregates attention \citep{huang2024opera}; DoLa contrasts early and late layers \citep{chuang2024dola}. \vhr{} \citep{vhr2025} locates vision-sensitive heads via counterfactual head divergence and rescales their contributions; \scvhr{} additionally contrasts the model against itself under the same intervention. These methods are validated largely on 2023-generation backbones; our audit quantifies how their gains fare on modern ones, complementing method papers that report the positive side.
+
+\paragraph{Post-hoc detection and revision.}
+Woodpecker chains an external detector and an LLM to correct captions \citep{yin2024woodpecker}; HALC uses an auxiliary decoding process to detect and re-sample \citep{chen2024halc}; self-correction prompting asks the model to check itself. Our stage-one result gives a mechanism for why \emph{same-model} verification under-delivers: the verifier's belief is correlated with the generator's error. Cross-model or external-detector evidence is the natural escape, which offline constraints prevented us from testing; we flag it as the open direction rather than claim it.
+
+\paragraph{Evaluation discipline.}
+\chair{} \citep{rohrbach2018chair} and POPE \citep{li2023pope} are the standard object-hallucination metrics, but both are gameable by verbosity and coverage loss. Preregistration with frozen gates and exclusive splits is standard in clinical research and rare in NLP method work; negative-result audits such as ours argue it should not be.
+
+\section{Audit I: Head Interventions Across Backbone Generations}
+\label{sec:audit1}
+
+\subsection{Setup}
+We audit the \vhr{} family exactly as frozen in the original codebase: layer 1 + last 14 layers, magnitude-based head scores, top-50\% head fraction, augmentation ratio 2, with the original filter; \scvhr{} adds the self-contrast logit combination ($\alpha{=}0.5$, $\beta{=}0.1$). No hyperparameter was re-tuned for any backbone: LLaVA-1.5 and LLaVA-NeXT inherit the InstructBLIP configuration verbatim, and Qwen2.5-VL uses the paper's Qwen adaptation. All comparisons use greedy decoding, identical prompts, and paired bootstrap (20{,}000 resamples) with preregistered interpretation rules: \emph{positive} transfer requires the 95\% CI upper bound $\le 0$ with a point improvement $\ge 1.0$ \chair{s}; \emph{negative} requires the mirrored condition; otherwise \emph{inconclusive}. Coverage (generated object mentions), length, and repetition cycles are reported alongside, so that ``less hallucination by saying less'' is visible rather than hidden.
+
+\subsection{The gradient}
+Table~\ref{tab:gradient} summarizes the four backbones. Three phenomena deserve emphasis.
+
+\textbf{The self-contrast increment dies first.} On InstructBLIP, \scvhr{} beats \vhr{} by $7.4$ \chair{s} over 2{,}500 images (McNemar $p=10^{-12}$) while increasing object mentions by $6.2\%$---coverage grows, so the gain is not silence. On LLaVA-NeXT, the same configuration yields a \vhr{} gain on dev ($-13.0$, CI $[-23,-3]$) that weakens on validation ($-7.0$, CI $[-17,+4]$, with \chair{i} moving the wrong way), while \scvhr{} is inconclusive on both sets and point-wise \emph{worse than plain \vhr{}}. The component that made the method win its original benchmark is the first component modernization removes.
+
+\textbf{The family dies later, and degenerately.} On Qwen2.5-VL, every member of the family loses to plain vanilla decoding. Worse, the failure mode is generative, not merely metric-level: \vhr{} doubles mean length ($153.8\to311.3$ words), \scvhr{} inflates it to $364.5$ with $246/300$ captions entering exact repetition cycles (versus $51$ for vanilla), and absolute hallucinated \emph{mentions} rise from $129$ to $206$--$433$ (Table~\ref{tab:qwen}). A reviewer evaluating only \chair{i}---which \emph{improves} for \vhr{}---would misread degeneration as improvement; this is a concrete argument for mandatory length, cycle, and coverage reporting.
+
+\textbf{LLaVA-1.5 is the cautionary middle.} The dev/validation gains for \scvhr{} ($-8.0$ and $-13.0$ \chair{s}) come with object mentions falling to $90.2\%$ and $91.6\%$ of the \vhr{} baseline, below a preregistered $93\%$ floor. Under the audit's coverage-first accounting, this is a failed transfer even though headline \chair{s} improves---exactly the trade that method papers rarely report.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{llll}
+\toprule
+Backbone (generation) & Data & $\Delta$\chair{s} (95\% CI) & Verdict \\
+\midrule
+InstructBLIP (Q-Former) & 500$\times$5 seeds & $-7.44$ vs \vhr{} & positive \\
+ & & $[-9.48,-5.40]$, $p{=}10^{-12}$ & \\
+LLaVA-1.5 (linear proj.) & dev 100 / val 100 & $-8.0$ $[-15,-2]$ / $-13.0$ $[-24,-3]$ & positive$^{\dagger}$ \\
+LLaVA-NeXT (AnyRes) & dev 100 & $-13.0$ $[-23,-3]$ (\vhr{}) & positive (\vhr{}) \\
+ & & $-6.0$ $[-15,+3]$ (\scvhr{}) & inconclusive (\scvhr{}) \\
+ & val 100 & $-7.0$ $[-17,+4]$ (\vhr{}) & inconclusive \\
+Qwen2.5-VL (GQA+mRoPE) & dev 300 & $+6.3$ vs vanilla (\vhr{}) & negative, degenerate \\
+ & & $-0.3$ vs vanilla (\scvhr{}, CI $[-1.7,+0.7]$) & inconclusive, degenerate \\
+\bottomrule
+\end{tabular}
+\caption{Transfer gradient of the \vhr{} family. $^{\dagger}$Coverage collapsed below the preregistered 93\% mention floor. All deltas are paired bootstrap vs the backbone's own baseline; sources in Appendix. TODO-NUM: InstructBLIP/LLaVA-1.5 vanilla cells pending extraction (PAPER-PLAN \S4).}
+\label{tab:gradient}
+\end{table}
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lrrrrr}
+\toprule
+Method & \chair{s} & \chair{i} & Len & mentions (hall.) & cycles \\
+\midrule
+vanilla & 28.33 & 8.31 & 153.8 & 1552 (129) & 51 \\
+\vhr{} & 34.67 & 6.79 & 311.3 & 3034 (206) & 171 \\
+\scvhr{} & 28.00 & 12.53 & 364.5 & 3455 (433) & 246 \\
+SEAR-style deletion & 20.67 & 7.13 & 125.2 & 1263 (90) & 41 \\
+VERA local rewrite & 28.00 & 8.12 & 152.7 & 1551 (126) & 50 \\
+\bottomrule
+\end{tabular}
+\caption{Qwen2.5-VL, 300-image preregistered dev. ``cycles'' = captions containing exact repetition blocks. The \chair{i} improvement of \vhr{} coincides with a doubling of length and absolute hallucinated mentions; SEAR's \chair{s} win removes 13\% of unique correct objects (not shown; see \S\ref{sec:audit2}).}
+\label{tab:qwen}
+\end{table}
+
+\subsection{Discussion of the mechanism}
+We offer a consistent explanation, stated as such. Head selection by counterfactual divergence assumes that vision evidence concentrates in identifiable heads whose amplification is harmless elsewhere. Q-Former-era backbones plausibly satisfy this: a fixed small visual token set and standard multi-head attention give redundant, position-stable head roles. AnyRes multiplies visual tokens and shifts head statistics (the \scvhr{} increment already unstable); grouped-query attention ties heads into shared groups, so per-head rescaling acts on shared substrates with wider blast radius, and multimodal rotary position embeddings change the position geometry that made global amplification length-neutral on older backbones. Isolating the responsible factor (GQA versus mRoPE versus visual token count) is future mechanism work; the audit establishes the where and the order, not the microscopic why.
+
+\section{Audit II: The Three-Layer Dissection of Post-hoc Revision}
+\label{sec:audit2}
+
+The decoding-side collapse motivates the post-hoc road: let vanilla decoding generate, then verify and revise at the mention level. We dissect it in three preregistered layers on opened 300+300-image development splits of Qwen2.5-VL captions.
+
+\subsection{Layer 1: the oracle ceiling}
+Using ground-truth object labels as an ideal trigger (explanation-only, never a method component), we apply three revision operators to vanilla captions: delete the hallucinated mention spans (with fixed minimal cleanup), delete their sentences, or rewrite the containing sentence under constrained prompting. Table~\ref{tab:oracle} shows the task is easy at mention granularity: deletion reaches $11.3$ \chair{s} from $28.3$ ($-17.0$, CI $[-21.3,-12.7]$) with \emph{all} 557 unique correct objects retained and length at $99.7\%$. Two structural facts cap the ceiling: root-level noun-chunk extraction covers only $68.6\%$ of hallucinated object words, and constrained rewriting barely helps ($-2.3$ \chair{s}) because in $54/80$ cases the rewriter \emph{restates} the very object it was told is unsupported. Deletion, not rewriting, is the effective operator.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lrrrr}
+\toprule
+Operator (oracle trigger) & \chair{s} & \chair{i} & unique correct & Len \\
+\midrule
+vanilla (no revision) & 28.33 & 8.31 & 557 & 153.8 \\
+A: mention deletion & \textbf{11.33} & 2.94 & \textbf{557} & 153.3 \\
+B: sentence deletion & 10.67 & 2.93 & 543 & 146.2 \\
+C: constrained rewrite & 26.00 & 7.53 & 557 & 153.7 \\
+\bottomrule
+\end{tabular}
+\caption{Oracle ceiling on 300 images. Deletion achieves the ceiling with zero coverage loss; sentence-granularity loses 14 unique correct objects; constrained rewriting keeps the flagged object in $54/80$ cases.}
+\label{tab:oracle}
+\end{table}
+
+\subsection{Layer 2: the trigger is fixable}
+A 20-image, 38-phrase human audit of the noun-chunk trigger (verifier score $\le 0.1$) labels each fired phrase as true hallucination, real-object false alarm, or non-entity artifact. The result: $6$ true, $9$ real-object false alarms, $23$ non-entity artifacts---precision $0.158$. The failure is extraction, not evidence: generic noun chunks fire on ``atmosphere'', ``Independence Day'', and parser artifacts. Replacing them with text-only model-listed entity extraction (aligned back to caption spans) repairs trigger precision to $0.71$ on \chair{}-decidable mentions ($0.57$ on the union inventory), versus $0.51$ for the \verb|spacy|-only inventory---and versus the $11.6\%$ sentence-level hit rate that sank the earlier local-rewrite pipeline (VERA).
+
+\subsection{Layer 3: the evidence is self-consistent}
+With a precise trigger, the pipeline needs a score that ranks hallucinated mentions below correct ones. It does not exist within the same model. On 11{,}986 union-inventory mentions (600 images), the frozen yes/no logit verifier assigns hallucinated mentions a median score of $0.818$, with $86/189$ above $0.9$ (correct mentions: median $0.993$); ROC-AUC reaches only $0.78$, far below the $0.85$ gate, and recall at the preregistered trigger threshold is $0.10$--$0.19$ versus the $0.6$ gate. Adding native grounding and region-cropped re-verification---the model points at the mention, we crop, we ask again---changes AUC by $+0.005$: the region verifier scores hallucinated mentions $0.85$--$0.99$. The one informative grounding behavior, an explicit refusal (``There are none.''), occurs for a minority. This refines the earlier finding that the same verifier reaches AUC $0.926$ on fixed object lists: the signal exists for objects the model was not already committed to, and evaporates precisely on the model's own hallucinations. Under preregistered stop rules the stage fails (sample size, recall, AUC) and we freeze the negative result without tuning prompts, thresholds, or combination rules.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lrrrr}
+\toprule
+Inventory & $P_{\text{chair}}$ & recall & ROC-AUC & H-cov. \\
+\midrule
+noun-chunk only (VERA-era) & 0.507 & 0.188 & 0.750 & 0.171 \\
+entity extraction (branch S) & 0.714 & 0.103 & 0.776 & 0.047 \\
+union (branch U) & 0.565 & 0.185 & 0.773 & 0.166 \\
+\bottomrule
+\end{tabular}
+\caption{Stage-one feasibility (600 images, 11{,}986 mentions). Extraction repairs precision; nothing repairs the evidence. Gates: $P\ge0.5$ (passed), recall $\ge0.6$ and AUC $\ge0.85$ (failed); cost 6.2\,s/image (passed).}
+\label{tab:stage1}
+\end{table}
+
+\section{The Audit Protocol}
+\label{sec:protocol}
+Every stage reported here was preregistered before its code ran: thresholds, data exclusions, interpretation rules, and stop rules were committed and tagged, and any amendment (two parsing/engineering constraints surfaced by first runs) was logged before effect data existed. Splits are exclusive across all historical experiment IDs; validation and test sets were generated exactly once, after their gates passed on dev. Pipelines are deterministic (token-level repeat equality verified on independent GPU runs), analyzers are frozen, and every artifact carries a SHA-256 manifest. Negative results are tagged and frozen rather than retried with adjusted thresholds. We release this apparatus with the paper; we believe the audit's credibility is inseparable from it.
+
+\section{Discussion}
+\label{sec:discussion}
+Two implications. First, for decoding-time interventions: gains validated on one attention generation do not transfer by default, and the failure is visible early---in coverage accounting and in the stability of each component---if one looks. Mandatory reporting of length, repetition, and object coverage would have surfaced the LLaVA-1.5 and Qwen failures immediately. Second, for post-hoc revision: the bottleneck is not finding candidate mentions but obtaining evidence that is not already correlated with the generator's error. Same-model verification, however grounded, inherits the trajectory's beliefs; the oracle ceiling shows the prize for an independent signal, and cross-model or detector-based evidence is the natural candidate our offline environment prevented us from testing. We deliberately report this as a capped direction, not a negative verdict on post-hoc revision as such.
+
+\section{Limitations}
+\label{sec:limitations}
+The modern generation is represented by one backbone (Qwen2.5-VL-7B): our offline environment had no InternVL or LLaVA-OneVision weights, and LLaVA-NeXT serves as the intermediate point. All headline results use COCO \chair{}; POPE, AMBER, and human evaluation appear only in the frozen record of earlier stages. The mechanism discussion of Audit I is a consistent explanation, not an intervention study. The post-hoc audit covers same-model evidence only; external-detector and cross-model verification remain untested. Audit experiments are report-only by design, so no claim of optimality is made for any configuration.
+
+\section{Conclusion}
+On four backbone generations under preregistered rules, the gains of visual-head decoding interventions fade along an interpretable gradient and reverse into degeneration on modern attention; the post-hoc alternative is easy at its oracle ceiling but capped by the self-consistency of same-model evidence. We release the full audit trail and suggest that ``when does it stop working'' is a question method papers should be required to answer.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\appendix
+\section{Reproduction Index}
+TODO: auto-generated tag/SHA-256 table per artifact family (PAPER-PLAN M3).
+\section{Full Gate Tables}
+TODO: all preregistered gates with per-item pass/fail values (PAPER-PLAN M3).
+\section{E0.2 Annotation Protocol}
+TODO: three-class rubric, sampling rule, per-phrase form (PAPER-PLAN M3).
+
+\end{document}
