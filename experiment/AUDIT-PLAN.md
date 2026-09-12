@@ -97,3 +97,32 @@ Qwen2.5-VL 一支；LLaVA-1.6 作为 AnyRes 中间代补位。若网络恢复可
 - 2026-09-11：方案 B 决策记录；LLaVA-1.6 对照预注册冻结。此时未编写任何
   llava16 代码，未生成任何输出。盘点确认 `models/llava-v1.6-vicuna-7b-hf`
   本地可用、`utils.py` 已支持 LlavaNext 加载、`main.py` 已支持 scvhr 方法分发。
+- 2026-09-11（LLaVA-1.6 对照完成与判定）：
+  - 工程：`scripts/run_llava16_audit.py`（配置逐字继承 LLaVA-1.5 记录）；
+    三方法确定性 smoke 全过（每方法 2 图 × 2 次经生产路径逐字一致）；
+    dev+validation 各 100 行、ID 唯一、与预注册文件一致；单方法单次加载内
+    顺序完成两集合（vanilla 741s、VHR 720s、SC 1423s/200 图）。
+  - 结果（quickchair，历史正式栈；bootstrap seed 20260716，20000 次）：
+
+    | 集合 | 方法 | CHAIRs | CHAIRi | Len | 提及(幻觉) | ΔCHAIRs vs vanilla | 95% CI | P(<0) |
+    |---|---|---:|---:|---:|---|---:|---|---:|
+    | dev | vanilla | 35.0 | 10.68 | 157.4 | 618(66) | — | — | — |
+    | dev | VHR | 22.0 | 6.59 | 155.3 | 622(41) | **−12.99** | [−23.0, −3.0] | 0.993 |
+    | dev | SC-VHR | 29.0 | 7.84 | 149.5 | 612(48) | −6.03 | [−15.0, +3.0] | 0.883 |
+    | validation | vanilla | 37.0 | 7.51 | 157.3 | 679(51) | — | — | — |
+    | validation | VHR | 30.0 | 8.82 | 152.0 | 692(61) | −6.96 | [−17.0, +4.0] | 0.885 |
+    | validation | SC-VHR | 34.0 | 9.47 | 153.1 | 697(66) | −2.98 | [−12.0, +6.0] | 0.707 |
+
+  - 按第 3.3 节预注册解释规则：**VHR = 部分正迁移**（dev CI 上界 −3.0 ≤ 0
+    且改善 ≥1 → 正；validation CI 跨 0 → 无显著；validation CHAIRi +1.30
+    反向）；**SC-VHR = 无显著/混合**（两集合 CI 均跨 0，点估计均劣于同集 VHR）。
+    退化检查：长度比 0.97–0.99、提及数保持、exact cycle 全部 0——无 Qwen 式
+    生成退化。
+  - 跨主干谱系定稿：InstructBLIP（SC 强正，官方五种子）→ LLaVA-1.5（SC 正向
+    但覆盖坍塌）→ **LLaVA-1.6（VHR 部分正、SC 增量消失）** → Qwen2.5-VL（全
+    家族负迁移 + 长度/cycle 退化）。主张一的叙事从"悬崖"细化为"梯度"：
+    SC 对比增量最先消失（AnyRes 代），整个 head 干预家族在 GQA/mRoPE 代崩塌。
+  - 输出 SHA256（`llava16_audit_{dev,validation}_results/llava-v1.6-vicuna-7b-hf/`）：
+    dev vanilla `d1ff5f27…6fd03c`、dev VHR `90193314…bf0db2`、
+    dev SC `ddc3e20c…335e9e0`、val vanilla `1776ed0e…b639e7`、
+    val VHR `ef3c5aef…1def9732`、val SC `1c0d8e1a…e23ffdd`。
