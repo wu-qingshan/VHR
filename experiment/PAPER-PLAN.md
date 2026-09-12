@@ -1,15 +1,18 @@
 # PAPER-PLAN：审计论文写作计划与分工
 
-> 日期：2026-09-12
+> 日期：2026-09-12（同日修订：转向中文核心）
 > 分支：`research/qwen-mgr`
 > 素材基线：tag `audit-llava16-complete-20260911` 及 AUDIT-PLAN.md 第 2 节全部冻结索引
-> 目标：EMNLP 2027 主会长文（8 页正文 + 无限附录）；备选 Findings。**投稿定位由本人最终决策。**
+> 目标（2026-09-12 修订）：**中文核心期刊**（候选与适配见 `paper/theme_zh.md`；
+> 期刊与题目候选由本人选定）。写作语言：中文；学报篇幅 15–25 页。
+> 原英文会议定位（EMNLP 2027）保留为后备：英文初稿 `paper/main.tex` 作为
+> 素材底稿保留在仓库，不再作为主线维护。
 
-## 0. 论文身份（题目候选，本人定夺）
+## 0. 论文身份（中文核心版）
 
-1. *When Do Visual-Head Interventions Survive Backbone Modernization? A Preregistered Audit of Decoding-Time and Post-hoc Hallucination Mitigation*
-2. *Self-Consistent Hallucination: An Audit of Why Head-Level and Mention-Level Mitigation Both Fade on Modern LVLMs*
-3. *The Gradient Collapse of Vision-Head Interventions: A Four-Backbone Preregistered Audit*
+题目候选 A–D、主题定位段、摘要四段式骨架、创新点表述与审稿偏好适配清单
+见 **`paper/theme_zh.md`**。体裁定位：评测与分析类论文；负结果统一表述为
+"失效边界与机制刻画"。
 
 叙事双主张（AUDIT-PLAN 第 1 节三主张合并表述）：
 - **A（解码期）**：VHR/SC-VHR 家族的收益沿主干现代化呈梯度消失——InstructBLIP 强正
@@ -28,29 +31,32 @@
    再运行。
 3. 数字一致性由脚本自审（我负责）：论文表格 ↔ 物化 JSON 自动对账。
 
-## 2. 分工表（核心）
+## 2. 分工表（核心，2026-09-12 中文核心修订版）
 
 ### 我（实验代理）负责
 
 | 项 | 说明 | 交付物 |
 |---|---|---|
-| LaTeX 骨架与全部章节英文初稿 | `paper/main.tex`（article 类占位，投稿时换 ACL 模板，本机无编译器，源码供 Overleaf） | M1–M2 |
+| 中文主稿全部章节初稿 | `paper/main_zh.tex`（或目标学报模板；先以通用中文排版起草，学报模板确定后移植）；摘要四段式 + 创新点按 theme_zh.md 骨架 | M1–M2 |
+| 国内相关工作初选 | 引言所需 8–12 篇中文/国产模型文献候选清单（你确认取舍） | M2 |
 | 表格数字提取与对账 | 每表标注来源；对账脚本 `scripts/audit_paper_numbers.py` | M1、持续 |
-| 图 v1 | matplotlib 脚本 + PDF：①主干梯度图（四主干 ΔCHAIRs + CI）②幻觉/正确 mention 分数分布 ③幻觉-覆盖-成本 Pareto ④触发精度阶梯（VERA→E0.2→MGR） | M3 |
-| BibTeX 初稿 | VHR(ACL'25)、CHAIR、POPE、VCD、OPERA、DoLa、HALC、Woodpecker、LLaVA-1.5/NeXT、InstructBLIP、Qwen2.5-VL、AMBER/MMHal（如提及） | M2 |
-| 复现附录 | tag/SHA256/门槛文档索引表自动生成 | M3 |
-| 语言初稿润色一轮 | 语法与一致性，不改变主张 | M4 |
+| 图 v1（中文化标注） | matplotlib 脚本 + PDF：①主干梯度图（四主干 ΔCHAIRs + CI）②幻觉/正确 mention 分数分布 ③幻觉-覆盖-成本 Pareto ④触发精度阶梯 | M3 |
+| 参考文献（GB/T 7714） | 中英混排条目；VHR(ACL'25) 作者栏由你补 | M2 |
+| 复现附录/正文附表 | tag/SHA256/门槛判定表索引（学报篇幅允许可入正文） | M3 |
+| 投稿格式自查清单 | 目标学报格式/查重自查项列表，你执行 | M5 |
 
 ### 你（作者本人）负责——不可委托
 
 | 项 | 说明 | 时机 |
 |---|---|---|
-| 科学主张终审 | Intro 的 claim 强度、Discussion 的因果解释边界（如 GQA/mRoPE 解释只能写"consistent with"而非"proved"） | M2 后逐节 |
-| Related work 核对 | 我给的每条引用你读原文摘要确认表述无误 | M2 |
-| 图的最终判定 | 可读性、信息密度、"论文品味" | M3 |
-| 语言定稿与 voice | 全文润色；作者立场句（"we argue…"）由你定 | M4–M5 |
-| 投稿决策 | 题目、venue（main/Findings）、作者列表、匿名化边界 | M5 |
-| 补实验决策 | 第 4 节待定清单的取舍 | 随时 |
+| 题目候选定夺 | theme_zh.md 第 2 节 A–D 选一（或改写） | 立即 |
+| 期刊选定 | theme_zh.md 第 6 节候选 | 立即 |
+| 科学主张终审 | 引言 claim 强度、讨论的因果解释边界（GQA/mRoPE 只能写"与…一致"而非"证明"） | M2 后逐节 |
+| 国内文献取舍 | 我初选清单的确认 | M2 |
+| 图的最终判定 | 可读性、信息密度 | M3 |
+| 语言定稿 | 全文润色；作者立场句 | M4–M5 |
+| 作者信息/基金/单位 | 我不经手 | M5 |
+| 补实验决策 | 第 4 节待定清单（InstructBLIP/LLaVA-1.5 vanilla 基线等） | 随时 |
 
 ## 3. 章节映射与页数预算（8 页正文）
 
@@ -74,14 +80,18 @@
 2. （可选）Qwen vanilla 在 llava 同款 100 图 dev 上的数字，统一图集口径。
 3. （可选，若网络恢复）第二现代主干（InternVL2.5）替换 limitation 声明。
 
-## 5. 里程碑
+## 5. 里程碑（中文核心修订版）
 
-- **M1（今天起）**：`paper/` 骨架 + §3/§4 初稿（数字嵌入、TODO-NUM 标注待提取项）
-- **M2**：§1/§2/§5/§6/§7/§8 初稿 + bib；交你逐节审
-- **M3**：图 v1 + 附录 + 对账脚本全绿
-- **M4**：你审改回传，我改稿 + 一轮润色
-- **M5**：Overleaf 编译、交叉引用、匿名化、投稿包
+- **M1（已完成）**：英文骨架与 §3/§4 底稿（作为素材保留）；
+- **M1.5（已完成，2026-09-12）**：中文核心转向——主题定位、题目候选、摘要
+  骨架、创新点与适配清单（`paper/theme_zh.md`）；
+- **M2**：中文主稿全节初稿 + 国内文献初选 + GB/T 7714 文献表；交你逐节审
+- **M3**：中文化图 v1 + 门槛判定附表 + 对账脚本全绿
+- **M4**：你审改回传，我改稿 + 一轮中文润色
+- **M5**：学报模板移植、格式/查重自查清单执行、投稿包
 
 ## 6. 日志
 
 - 2026-09-12：本计划冻结；`paper/` 骨架与 §3/§4 初稿开始。
+- 2026-09-12：目标改为中文核心期刊（本人决策）；语言改中文，主题/题目/摘要
+  骨架见 `paper/theme_zh.md`；英文稿降级为素材底稿；分工表与里程碑同步修订。
